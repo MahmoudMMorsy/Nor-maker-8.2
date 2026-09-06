@@ -1,0 +1,8 @@
+{
+  "name": "NOR Maker",
+  "description": "Retro game creation studio & GameMaker IDE for 2D retro games, sprite & level editors, and native execution.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

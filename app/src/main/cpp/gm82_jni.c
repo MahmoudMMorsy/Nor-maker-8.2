@@ -6,57 +6,71 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "gml_vm.h"
+#include "gm82_assets.h"
+
 #define LOG_TAG "NOR_NATIVE"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+static gm82_runtime_world g_world;
+static gm82_asset_manager g_assets;
 static int g_runtime_active = 0;
-static int g_current_room = 0;
-static int g_room_w = 640;
-static int g_room_h = 480;
 static char g_token_buf[1024] = {0};
 static char g_token_sep[16] = {0};
 static char *g_token_ctx = NULL;
 
 JNIEXPORT jboolean JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeCreate(JNIEnv *env, jclass clazz, jint width, jint height) {
+    gm82_world_init(&g_world, width, height);
+    gm82_asset_manager_init(&g_assets);
     g_runtime_active = 1;
-    g_room_w = width > 0 ? width : 640;
-    g_room_h = height > 0 ? height : 480;
-    LOGI("Runtime created: %dx%d", g_room_w, g_room_h);
+    LOGI("Runtime created: %dx%d", g_world.room_width, g_world.room_height);
     return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeDestroy(JNIEnv *env, jclass clazz) {
+    gm82_world_cleanup(&g_world);
+    gm82_asset_manager_clear(&g_assets);
     g_runtime_active = 0;
     LOGI("Runtime destroyed");
 }
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeStep(JNIEnv *env, jclass clazz, jfloat delta) {
+    if (g_runtime_active) {
+        gm82_world_step(&g_world, (double)delta);
+    }
 }
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeKey(JNIEnv *env, jclass clazz, jint keyCode, jboolean down) {
+    if (keyCode >= 0 && keyCode < 256) {
+        g_world.key_state[keyCode] = down ? 1 : 0;
+    }
 }
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeSetRoom(JNIEnv *env, jclass clazz, jint roomId, jint width, jint height, jboolean clearInstances) {
-    g_current_room = roomId;
-    if (width > 0) g_room_w = width;
-    if (height > 0) g_room_h = height;
+    g_world.room_id = roomId;
+    if (width > 0) g_world.room_width = width;
+    if (height > 0) g_world.room_height = height;
+    if (clearInstances) {
+        g_world.instance_count = 0;
+    }
 }
 
 JNIEXPORT jint JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeGetRoom(JNIEnv *env, jclass clazz) {
-    return g_current_room;
+    return g_world.room_id;
 }
 
 JNIEXPORT jstring JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeSnapshotJson(JNIEnv *env, jclass clazz) {
-    char buf[256];
-    snprintf(buf, sizeof(buf), "{\"room\":%d,\"width\":%d,\"height\":%d,\"instances\":[]}", g_current_room, g_room_w, g_room_h);
+    char buf[512];
+    snprintf(buf, sizeof(buf), "{\"room\":%d,\"width\":%d,\"height\":%d,\"instances\":[]}",
+             g_world.room_id, g_world.room_width, g_world.room_height);
     return (*env)->NewStringUTF(env, buf);
 }
 
@@ -90,13 +104,29 @@ Java_com_normaker_nativefull_MainActivity_nativeRuntimeClearEvents(JNIEnv *env, 
 
 JNIEXPORT jint JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeAddInstance(JNIEnv *env, jclass clazz, jint objectId, jint spriteId, jint spriteWidth, jint spriteHeight, jint spriteSubimages, jfloat x, jfloat y, jfloat vx, jfloat vy) {
-    static int inst_counter = 100000;
-    return ++inst_counter;
+    gm82_instance *inst = gm82_world_add_instance(&g_world, objectId, x, y);
+    if (!inst) return -1;
+    inst->sprite_index = spriteId;
+    inst->sprite_width = spriteWidth;
+    inst->sprite_height = spriteHeight;
+    inst->sprite_subimages = spriteSubimages;
+    inst->hspeed = vx;
+    inst->vspeed = vy;
+    inst->speed = sqrt(vx * vx + vy * vy);
+    return inst->id;
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeSetSpriteBitmap(JNIEnv *env, jclass clazz, jint spriteId, jint frame, jint width, jint height, jbyteArray rgba) {
-    return JNI_TRUE;
+    if (!rgba) return JNI_FALSE;
+    jbyte *bytes = (*env)->GetByteArrayElements(env, rgba, NULL);
+    jsize len = (*env)->GetArrayLength(env, rgba);
+    jboolean ok = JNI_FALSE;
+    if (len >= width * height * 4) {
+        ok = gm82_asset_set_sprite_bitmap(&g_assets, spriteId, frame, width, height, (const uint8_t *)bytes) ? JNI_TRUE : JNI_FALSE;
+    }
+    (*env)->ReleaseByteArrayElements(env, rgba, bytes, JNI_ABORT);
+    return ok;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -106,10 +136,12 @@ Java_com_normaker_nativefull_MainActivity_nativeRuntimeRenderBitmap(JNIEnv *env,
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeClearInstances(JNIEnv *env, jclass clazz) {
+    g_world.instance_count = 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeClearRoomTransient(JNIEnv *env, jclass clazz) {
+    g_world.instance_count = 0;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -224,16 +256,22 @@ Java_com_normaker_nativefull_MainActivity_nativeValidateRom(JNIEnv *env, jclass 
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeClearResourceRegistry(JNIEnv *env, jclass clazz) {
+    gm82_asset_manager_clear(&g_assets);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRegisterResource(JNIEnv *env, jclass clazz, jint kind, jint id, jstring name, jint width, jint height, jint frames) {
+    const char *native_name = name ? (*env)->GetStringUTFChars(env, name, NULL) : NULL;
+    if (kind == 0) { // Sprite
+        gm82_asset_register_sprite(&g_assets, id, native_name, width, height, frames, 0, 0);
+    }
+    if (name && native_name) (*env)->ReleaseStringUTFChars(env, name, native_name);
     return id;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeResourceCount(JNIEnv *env, jclass clazz) {
-    return 0;
+    return (jint)(g_assets.sprite_count + g_assets.background_count);
 }
 
 JNIEXPORT jint JNICALL
@@ -271,8 +309,8 @@ Java_com_normaker_nativefull_MainActivity_nativeGm82TokenStart(JNIEnv *env, jcla
     if (!text || !separator) return 0;
     const char *native_str = (*env)->GetStringUTFChars(env, text, NULL);
     const char *native_sep = (*env)->GetStringUTFChars(env, separator, NULL);
-    strncpy(g_token_buf, native_str, sizeof(g_token_buf)-1);
-    strncpy(g_token_sep, native_sep, sizeof(g_token_sep)-1);
+    strncpy(g_token_buf, native_str, sizeof(g_token_buf) - 1);
+    strncpy(g_token_sep, native_sep, sizeof(g_token_sep) - 1);
     (*env)->ReleaseStringUTFChars(env, text, native_str);
     (*env)->ReleaseStringUTFChars(env, separator, native_sep);
     g_token_ctx = g_token_buf;

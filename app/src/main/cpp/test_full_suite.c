@@ -1,6 +1,7 @@
 #include "gm82_gmk_reader.h"
 #include "gml_frontend.h"
 #include "gml_vm.h"
+#include "gm82_assets.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +49,7 @@ void test_gml_vm_suite(void) {
 extern int gm82_native_call(void *userdata, const char *name, const gml_value *args, size_t count, gml_value *out);
 
 void test_gml_builtins_suite(void) {
-    gml_value args[4];
+    gml_value args[6];
     gml_value out;
 
     // Test point_distance(0, 0, 3, 4) == 5.0
@@ -66,6 +67,16 @@ void test_gml_builtins_suite(void) {
     args[3] = gml_value_real(-10.0);
     assert(gm82_native_call(NULL, "point_direction", args, 4, &out) == 1);
     assert(out.kind == GML_V_REAL && out.real == 90.0);
+
+    // Test point_distance_3d(0, 0, 0, 2, 3, 6) == 7.0
+    args[0] = gml_value_real(0.0);
+    args[1] = gml_value_real(0.0);
+    args[2] = gml_value_real(0.0);
+    args[3] = gml_value_real(2.0);
+    args[4] = gml_value_real(3.0);
+    args[5] = gml_value_real(6.0);
+    assert(gm82_native_call(NULL, "point_distance_3d", args, 6, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 7.0);
 
     // Test string_length("Hello") == 5
     args[0] = gml_value_string("Hello");
@@ -118,6 +129,35 @@ void test_gml_builtins_suite(void) {
     printf("[PASS] GML Built-ins Suite\n");
 }
 
+void test_instance_world_suite(void) {
+    gm82_runtime_world world;
+    gm82_world_init(&world, 640, 480);
+
+    gm82_instance *inst = gm82_world_add_instance(&world, 1, 10.0, 20.0);
+    assert(inst != NULL);
+    assert(inst->x == 10.0 && inst->y == 20.0);
+
+    inst->hspeed = 5.0;
+    inst->vspeed = 0.0;
+    gm82_world_step(&world, 0.016);
+    assert(inst->x == 15.0 && inst->y == 20.0);
+
+    gm82_world_cleanup(&world);
+    printf("[PASS] Instance World Suite\n");
+}
+
+void test_asset_manager_suite(void) {
+    gm82_asset_manager mgr;
+    gm82_asset_manager_init(&mgr);
+
+    assert(gm82_asset_register_sprite(&mgr, 1, "spr_player", 32, 32, 2, 16, 16) == 1);
+    uint8_t rgba[32 * 32 * 4] = {255};
+    assert(gm82_asset_set_sprite_bitmap(&mgr, 1, 0, 32, 32, rgba) == 1);
+
+    gm82_asset_manager_clear(&mgr);
+    printf("[PASS] Asset Manager Suite\n");
+}
+
 void test_retro_rom_suite(void) {
     const char *nes_path = "/tmp/nor_core_tests/test.nes";
     const char *gbc_path = "/tmp/nor_core_tests/test.gbc";
@@ -137,6 +177,8 @@ int main(void) {
     test_gmk_probe_suite();
     test_gml_vm_suite();
     test_gml_builtins_suite();
+    test_instance_world_suite();
+    test_asset_manager_suite();
     test_retro_rom_suite();
     printf("--- All Native Host Tests Passed! ---\n");
     return 0;

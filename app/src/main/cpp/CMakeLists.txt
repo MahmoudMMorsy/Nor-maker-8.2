@@ -5,6 +5,8 @@ add_library(
     gm82_android
     SHARED
     gm82_jni.c
+    gml_vm.c
+    gm82_assets.c
 )
 
 find_library(

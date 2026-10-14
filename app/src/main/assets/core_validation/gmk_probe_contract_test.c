@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include "../android_project_base/app/src/main/cpp/gm82_gmk_reader.h"
+#include "gm82_gmk_reader.h"
 
 static void put32(uint8_t *p, uint32_t v) {
     p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8);

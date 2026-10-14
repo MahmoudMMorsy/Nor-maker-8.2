@@ -1,3 +1,5 @@
+.gradle/
+*.keystore
 node_modules/
 build/
 dist/

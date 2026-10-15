@@ -154,6 +154,47 @@ gml_value gml_vm_get(gml_vm *vm, const char *n);
 int gml_vm_execute(gml_vm *vm, const gml_ast *root);
 int gml_vm_invoke(gml_vm *vm, const gml_ast *root, const gml_value *args, size_t count, gml_value *out);
 
+typedef enum gm82_event_type {
+    GM82_EVENT_CREATE = 0,
+    GM82_EVENT_DESTROY = 1,
+    GM82_EVENT_ALARM = 2,
+    GM82_EVENT_BEGIN_STEP = 3,
+    GM82_EVENT_STEP = 4,
+    GM82_EVENT_END_STEP = 5,
+    GM82_EVENT_COLLISION = 6,
+    GM82_EVENT_KEYBOARD = 7,
+    GM82_EVENT_MOUSE = 8,
+    GM82_EVENT_OTHER = 9,
+    GM82_EVENT_DRAW = 10
+} gm82_event_type;
+
+typedef struct gm82_instance {
+    int id;
+    int object_index;
+    double x, y;
+    double xprevious, yprevious;
+    double xstart, ystart;
+    double hspeed, vspeed;
+    double speed, direction;
+    double friction, gravity;
+    double gravity_direction;
+    double depth;
+    int visible, solid, persistent, destroyed;
+    int sprite_index, mask_index;
+    double image_index, image_speed, image_angle, image_alpha;
+    double image_xscale, image_yscale;
+    double alarms[12];
+    gml_vm vm;
+    const gml_ast *event_scripts[11];
+} gm82_instance;
+
+gm82_instance *gm82_instance_create(int id, int object_index, double x, double y);
+void gm82_instance_destroy(gm82_instance *inst);
+void gm82_instance_sync_vars_to_vm(gm82_instance *inst);
+void gm82_instance_sync_vars_from_vm(gm82_instance *inst);
+void gm82_instance_update_motion(gm82_instance *inst);
+void gm82_event_loop_step(gm82_instance **instances, size_t count);
+
 #ifdef __cplusplus
 }
 #endif

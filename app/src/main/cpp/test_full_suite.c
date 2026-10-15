@@ -118,6 +118,51 @@ void test_gml_builtins_suite(void) {
     printf("[PASS] GML Built-ins Suite\n");
 }
 
+void test_gm82_instance_and_event_loop_suite(void) {
+    // 1. Instance creation and motion physics test
+    gm82_instance *inst = gm82_instance_create(100001, 1, 100.0, 100.0);
+    assert(inst != NULL);
+    assert(inst->x == 100.0 && inst->y == 100.0);
+
+    inst->hspeed = 4.0;
+    inst->vspeed = -3.0;
+    inst->gravity = 0.5;
+    inst->gravity_direction = 270.0;
+
+    gm82_instance_update_motion(inst);
+    assert(inst->xprevious == 100.0 && inst->yprevious == 100.0);
+    assert(inst->x == 104.0);
+    assert(inst->vspeed == -2.5);
+    assert(inst->y == 97.5);
+
+    // 2. Test event loop execution
+    gml_ast *step_ast = NULL;
+    char err[160] = {0};
+    int ok = gml_parse_program("x += 1; y += 2;", &step_ast, err, sizeof(err));
+    assert(ok);
+
+    inst->event_scripts[GM82_EVENT_STEP] = step_ast;
+    gm82_instance *instances[1] = {inst};
+    gm82_event_loop_step(instances, 1);
+
+    assert(inst->x > 104.0);
+
+    gml_ast_free(step_ast);
+    gm82_instance_destroy(inst);
+
+    // 3. Test Sprite Asset and Bounding Box
+    gm82_sprite_asset *sp = gm82_sprite_asset_create(0, "spr_player", 32, 32, 16, 16, 4);
+    assert(sp != NULL);
+    assert(sp->width == 32 && sp->height == 32);
+    assert(sp->xorigin == 16 && sp->yorigin == 16);
+    assert(sp->bbox_left == 0 && sp->bbox_top == 0);
+    assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
+    assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+    gm82_sprite_asset_free(sp);
+
+    printf("[PASS] GM82 Instance & Event Loop Suite\n");
+}
+
 void test_retro_rom_suite(void) {
     const char *nes_path = "/tmp/nor_core_tests/test.nes";
     const char *gbc_path = "/tmp/nor_core_tests/test.gbc";
@@ -137,6 +182,7 @@ int main(void) {
     test_gmk_probe_suite();
     test_gml_vm_suite();
     test_gml_builtins_suite();
+    test_gm82_instance_and_event_loop_suite();
     test_retro_rom_suite();
     printf("--- All Native Host Tests Passed! ---\n");
     return 0;

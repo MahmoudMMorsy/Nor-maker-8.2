@@ -56,5 +56,77 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         return 1;
     }
 
+    // Motion built-in functions
+    if (!strcmp(name, "motion_set") && count == 2) {
+        double dir = args[0].real;
+        double spd = args[1].real;
+        double rad = dir * 0.017453292519943295;
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            inst->direction = dir;
+            inst->speed = spd;
+            inst->hspeed = spd * cos(rad);
+            inst->vspeed = -spd * sin(rad);
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "motion_add") && count == 2) {
+        double dir = args[0].real;
+        double spd = args[1].real;
+        double rad = dir * 0.017453292519943295;
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            inst->hspeed += spd * cos(rad);
+            inst->vspeed -= spd * sin(rad);
+            inst->speed = sqrt(inst->hspeed * inst->hspeed + inst->vspeed * inst->vspeed);
+            if (inst->speed > 0.00001) {
+                inst->direction = atan2(-inst->vspeed, inst->hspeed) / 0.017453292519943295;
+                if (inst->direction < 0.0) inst->direction += 360.0;
+            }
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+
+    // Instance & Collision built-ins
+    if (!strcmp(name, "place_free") && count == 2) {
+        *out = gml_value_bool(1);
+        return 1;
+    }
+    if (!strcmp(name, "place_empty") && count == 2) {
+        *out = gml_value_bool(1);
+        return 1;
+    }
+    if (!strcmp(name, "place_meeting") && count == 3) {
+        *out = gml_value_bool(0);
+        return 1;
+    }
+    if (!strcmp(name, "instance_exists") && count == 1) {
+        *out = gml_value_bool(1);
+        return 1;
+    }
+    if (!strcmp(name, "instance_number") && count == 1) {
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+
+    // Drawing & Text built-ins
+    if ((!strcmp(name, "draw_sprite") || !strcmp(name, "draw_sprite_ext") || !strcmp(name, "draw_text"))) {
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "string_width") && count == 1) {
+        const char *s = (args[0].kind == GML_V_STRING && args[0].string) ? args[0].string : "";
+        *out = gml_value_real((double)(strlen(s) * 8)); // 8px per character retro font width
+        return 1;
+    }
+    if (!strcmp(name, "string_height") && count == 1) {
+        *out = gml_value_real(16.0); // 16px font height
+        return 1;
+    }
+
     return 0;
 }

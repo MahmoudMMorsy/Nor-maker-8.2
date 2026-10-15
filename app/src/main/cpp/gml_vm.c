@@ -103,3 +103,239 @@ static gml_value eval(gml_vm*vm,const gml_ast*n){if(!n)return undef();switch(n->
  gml_value b=eval(vm,n->right);double x=num(a),y=num(b),z=0;int bo=0;gml_value r=undef();switch(n->op){case GML_T_PLUS:if(a.kind==GML_V_STRING||b.kind==GML_V_STRING){const char*as=a.kind==GML_V_STRING?(a.string?a.string:""):"";const char*bs=b.kind==GML_V_STRING?(b.string?b.string:""):"";size_t na=strlen(as),nb=strlen(bs);char*joined=malloc(na+nb+1);if(joined){memcpy(joined,as,na);memcpy(joined+na,bs,nb+1);r=gml_value_string(joined);free(joined);}else r=undef();}else z=x+y;break;case GML_T_MINUS:z=x-y;break;case GML_T_STAR:z=x*y;break;case GML_T_SLASH:z=y==0?0:x/y;break;case GML_T_PERCENT:z=fmod(x,y);break;case GML_T_EQ:bo=(a.kind==GML_V_STRING||b.kind==GML_V_STRING)?!strcmp(a.string?a.string:"",b.string?b.string:""):x==y;break;case GML_T_NE:bo=(a.kind==GML_V_STRING||b.kind==GML_V_STRING)?strcmp(a.string?a.string:"",b.string?b.string:"")!=0:x!=y;break;case GML_T_LT:bo=x<y;break;case GML_T_LE:bo=x<=y;break;case GML_T_GT:bo=x>y;break;case GML_T_GE:bo=x>=y;break;case GML_T_AND:bo=truth(a)&&truth(b);break;case GML_T_OR:bo=truth(a)||truth(b);break;default:break;}r=(n->op==GML_T_PLUS&&(a.kind==GML_V_STRING||b.kind==GML_V_STRING))?r:(((n->op>=GML_T_EQ&&n->op<=GML_T_GE)||n->op==GML_T_AND||n->op==GML_T_OR)?gml_value_bool(bo):gml_value_real(z));gml_value_free(&a);gml_value_free(&b);return r;}default:return undef();}}
 static void exec(gml_vm*vm,const gml_ast*n){if(!n||vm->returned||vm->error[0])return;switch(n->kind){case GML_AST_BLOCK:for(size_t i=0;i<n->count&&!vm->returned&&!vm->break_pending&&!vm->continue_pending&&!vm->error[0];i++)exec(vm,n->items[i]);break;case GML_AST_EXPR_STMT:{gml_value v=eval(vm,n->left);gml_value_free(&v);break;}case GML_AST_RETURN:vm->return_value=eval(vm,n->left);vm->returned=1;break;case GML_AST_EXIT:gml_value_free(&vm->return_value);vm->return_value=undef();vm->returned=1;break;case GML_AST_BREAK:vm->break_pending=1;break;case GML_AST_CONTINUE:vm->continue_pending=1;break;case GML_AST_IF:{gml_value c=eval(vm,n->left);if(truth(c))exec(vm,n->right);else if(n->count)exec(vm,n->items[0]);gml_value_free(&c);break;}case GML_AST_WHILE:{size_t guard=0;while(!vm->returned&&!vm->error[0]&&!vm->break_pending&&guard++<100000){gml_value c=eval(vm,n->left);int ok=truth(c);gml_value_free(&c);if(!ok)break;vm->continue_pending=0;exec(vm,n->right);if(vm->break_pending){vm->break_pending=0;break;}if(vm->continue_pending){vm->continue_pending=0;continue;}}if(guard>=100000&&!vm->returned)snprintf(vm->error,sizeof vm->error,"while loop limit exceeded");break;}case GML_AST_DO_UNTIL:{size_t guard=0;do{if(vm->returned||vm->error[0])break;vm->continue_pending=0;exec(vm,n->right);if(vm->break_pending){vm->break_pending=0;break;}if(vm->continue_pending)vm->continue_pending=0;gml_value c=eval(vm,n->left);int done=truth(c);gml_value_free(&c);if(done)break;}while(++guard<100000);if(guard>=100000&&!vm->returned&&!vm->error[0])snprintf(vm->error,sizeof vm->error,"do-until loop limit exceeded");break;}case GML_AST_SWITCH:{gml_value key=eval(vm,n->left);size_t match=(size_t)-1,def=(size_t)-1;for(size_t i=0;i<n->count;i++){const gml_ast*c=n->items[i];if(!c||c->kind!=GML_AST_SWITCH_CASE)continue;if(!c->left){def=i;continue;}gml_value cv=eval(vm,c->left);int same=(key.kind==GML_V_STRING||cv.kind==GML_V_STRING)?!strcmp(key.string?key.string:"",cv.string?cv.string:""):num(key)==num(cv);gml_value_free(&cv);if(same){match=i;break;}}if(match==(size_t)-1)match=def;if(match!=(size_t)-1){for(size_t i=match;i<n->count&&!vm->returned&&!vm->error[0];i++){const gml_ast*c=n->items[i];if(!c||c->kind!=GML_AST_SWITCH_CASE)continue;vm->continue_pending=0;exec(vm,c->right);if(vm->break_pending){vm->break_pending=0;break;}}}gml_value_free(&key);break;}case GML_AST_FOR:{if(n->count<4)break;gml_value init=eval(vm,n->items[0]);gml_value_free(&init);size_t guard=0;while(!vm->returned&&!vm->error[0]&&!vm->break_pending&&guard++<100000){gml_value c=eval(vm,n->items[1]);int ok=truth(c);gml_value_free(&c);if(!ok)break;vm->continue_pending=0;exec(vm,n->items[3]);if(vm->break_pending){vm->break_pending=0;break;}vm->continue_pending=0;gml_value post=eval(vm,n->items[2]);gml_value_free(&post);}if(guard>=100000&&!vm->returned)snprintf(vm->error,sizeof vm->error,"for loop limit exceeded");break;}case GML_AST_WITH:{gml_value target=eval(vm,n->left);if(vm->with_call)vm->with_call(vm->with_userdata,vm,&target,n->right);else snprintf(vm->error,sizeof vm->error,"with callback unavailable");gml_value_free(&target);break;}case GML_AST_REPEAT:{gml_value count=eval(vm,n->left);double raw=num(count);gml_value_free(&count);size_t limit=raw>0?(size_t)raw:0;if(limit>100000)limit=100000;for(size_t i=0;i<limit&&!vm->returned&&!vm->error[0];i++){vm->break_pending=0;vm->continue_pending=0;exec(vm,n->right);if(vm->break_pending){vm->break_pending=0;break;}if(vm->continue_pending)vm->continue_pending=0;}break;}default:break;}}
 int gml_vm_execute(gml_vm*vm,const gml_ast*root){if(!vm||!root)return 0;vm->error[0]=0;vm->returned=0;vm->break_pending=0;vm->continue_pending=0;gml_value_free(&vm->return_value);exec(vm,root);return vm->error[0]==0;} int gml_vm_invoke(gml_vm*vm,const gml_ast*root,const gml_value*args,size_t count,gml_value*out){if(!vm||!root)return 0;int old_returned=vm->returned,old_break=vm->break_pending,old_continue=vm->continue_pending;gml_value old_return=copyv(&vm->return_value);char old_error[160];memcpy(old_error,vm->error,sizeof old_error);vm->returned=0;vm->break_pending=0;vm->continue_pending=0;vm->error[0]=0;gml_vm_push_scope(vm);for(size_t i=0;i<count&&i<16;i++){char name[16];snprintf(name,sizeof name,"arg%zu",i);gml_vm_set(vm,name,args[i]);}gml_value_free(&vm->return_value);vm->return_value=undef();exec(vm,root);if(out)*out=copyv(&vm->return_value);int ok=vm->error[0]==0;gml_vm_pop_scope(vm);gml_value_free(&vm->return_value);vm->return_value=old_return;vm->returned=old_returned;vm->break_pending=old_break;vm->continue_pending=old_continue;if(!ok)memcpy(old_error,vm->error,sizeof old_error);memcpy(vm->error,old_error,sizeof vm->error);return ok;}
+
+#define GM82_DEG2RAD 0.017453292519943295
+
+void gm82_instance_sync_vars_to_vm(gm82_instance *inst) {
+    if (!inst) return;
+    gml_vm_set(&inst->vm, "x", gml_value_real(inst->x));
+    gml_vm_set(&inst->vm, "y", gml_value_real(inst->y));
+    gml_vm_set(&inst->vm, "xprevious", gml_value_real(inst->xprevious));
+    gml_vm_set(&inst->vm, "yprevious", gml_value_real(inst->yprevious));
+    gml_vm_set(&inst->vm, "xstart", gml_value_real(inst->xstart));
+    gml_vm_set(&inst->vm, "ystart", gml_value_real(inst->ystart));
+    gml_vm_set(&inst->vm, "hspeed", gml_value_real(inst->hspeed));
+    gml_vm_set(&inst->vm, "vspeed", gml_value_real(inst->vspeed));
+    gml_vm_set(&inst->vm, "speed", gml_value_real(inst->speed));
+    gml_vm_set(&inst->vm, "direction", gml_value_real(inst->direction));
+    gml_vm_set(&inst->vm, "friction", gml_value_real(inst->friction));
+    gml_vm_set(&inst->vm, "gravity", gml_value_real(inst->gravity));
+    gml_vm_set(&inst->vm, "gravity_direction", gml_value_real(inst->gravity_direction));
+    gml_vm_set(&inst->vm, "depth", gml_value_real(inst->depth));
+    gml_vm_set(&inst->vm, "visible", gml_value_bool(inst->visible));
+    gml_vm_set(&inst->vm, "solid", gml_value_bool(inst->solid));
+    gml_vm_set(&inst->vm, "persistent", gml_value_bool(inst->persistent));
+    gml_vm_set(&inst->vm, "sprite_index", gml_value_real((double)inst->sprite_index));
+    gml_vm_set(&inst->vm, "mask_index", gml_value_real((double)inst->mask_index));
+    gml_vm_set(&inst->vm, "image_index", gml_value_real(inst->image_index));
+    gml_vm_set(&inst->vm, "image_speed", gml_value_real(inst->image_speed));
+    gml_vm_set(&inst->vm, "image_angle", gml_value_real(inst->image_angle));
+    gml_vm_set(&inst->vm, "image_alpha", gml_value_real(inst->image_alpha));
+    gml_vm_set(&inst->vm, "image_xscale", gml_value_real(inst->image_xscale));
+    gml_vm_set(&inst->vm, "image_yscale", gml_value_real(inst->image_yscale));
+    gml_vm_set(&inst->vm, "id", gml_value_real((double)inst->id));
+    gml_vm_set(&inst->vm, "object_index", gml_value_real((double)inst->object_index));
+}
+
+void gm82_instance_sync_vars_from_vm(gm82_instance *inst) {
+    if (!inst) return;
+    double old_hs = inst->hspeed;
+    double old_vs = inst->vspeed;
+    double old_sp = inst->speed;
+    double old_dir = inst->direction;
+
+    inst->x = num(gml_vm_get(&inst->vm, "x"));
+    inst->y = num(gml_vm_get(&inst->vm, "y"));
+    inst->hspeed = num(gml_vm_get(&inst->vm, "hspeed"));
+    inst->vspeed = num(gml_vm_get(&inst->vm, "vspeed"));
+    inst->speed = num(gml_vm_get(&inst->vm, "speed"));
+    inst->direction = num(gml_vm_get(&inst->vm, "direction"));
+    inst->friction = num(gml_vm_get(&inst->vm, "friction"));
+    inst->gravity = num(gml_vm_get(&inst->vm, "gravity"));
+    inst->gravity_direction = num(gml_vm_get(&inst->vm, "gravity_direction"));
+    inst->depth = num(gml_vm_get(&inst->vm, "depth"));
+    inst->visible = truth(gml_vm_get(&inst->vm, "visible"));
+    inst->solid = truth(gml_vm_get(&inst->vm, "solid"));
+    inst->persistent = truth(gml_vm_get(&inst->vm, "persistent"));
+    inst->sprite_index = (int)num(gml_vm_get(&inst->vm, "sprite_index"));
+    inst->mask_index = (int)num(gml_vm_get(&inst->vm, "mask_index"));
+    inst->image_index = num(gml_vm_get(&inst->vm, "image_index"));
+    inst->image_speed = num(gml_vm_get(&inst->vm, "image_speed"));
+    inst->image_angle = num(gml_vm_get(&inst->vm, "image_angle"));
+    inst->image_alpha = num(gml_vm_get(&inst->vm, "image_alpha"));
+    inst->image_xscale = num(gml_vm_get(&inst->vm, "image_xscale"));
+    inst->image_yscale = num(gml_vm_get(&inst->vm, "image_yscale"));
+
+    // Recalculate speed/direction if hspeed/vspeed changed
+    if (inst->hspeed != old_hs || inst->vspeed != old_vs) {
+        inst->speed = sqrt(inst->hspeed * inst->hspeed + inst->vspeed * inst->vspeed);
+        if (inst->speed > 0.00001) {
+            inst->direction = atan2(-inst->vspeed, inst->hspeed) / GM82_DEG2RAD;
+            if (inst->direction < 0.0) inst->direction += 360.0;
+        }
+    } else if (inst->speed != old_sp || inst->direction != old_dir) {
+        double dir_rad = inst->direction * GM82_DEG2RAD;
+        inst->hspeed = inst->speed * cos(dir_rad);
+        inst->vspeed = -inst->speed * sin(dir_rad);
+    }
+}
+
+gm82_instance *gm82_instance_create(int id, int object_index, double x, double y) {
+    gm82_instance *inst = calloc(1, sizeof(gm82_instance));
+    if (!inst) return NULL;
+    inst->id = id;
+    inst->object_index = object_index;
+    inst->x = x;
+    inst->y = y;
+    inst->xprevious = x;
+    inst->yprevious = y;
+    inst->xstart = x;
+    inst->ystart = y;
+    inst->visible = 1;
+    inst->sprite_index = -1;
+    inst->mask_index = -1;
+    inst->image_xscale = 1.0;
+    inst->image_yscale = 1.0;
+    inst->image_alpha = 1.0;
+    inst->image_speed = 1.0;
+    for (int i = 0; i < 12; i++) inst->alarms[i] = -1.0;
+    gml_vm_init(&inst->vm);
+    gm82_instance_sync_vars_to_vm(inst);
+    return inst;
+}
+
+void gm82_instance_destroy(gm82_instance *inst) {
+    if (!inst) return;
+    for (size_t i = 0; i < inst->vm.count; i++) {
+        gml_value_free(&inst->vm.vars[i].value);
+    }
+    free(inst);
+}
+
+void gm82_instance_update_motion(gm82_instance *inst) {
+    if (!inst || inst->destroyed) return;
+    inst->xprevious = inst->x;
+    inst->yprevious = inst->y;
+
+    if (inst->gravity != 0.0) {
+        double grav_rad = inst->gravity_direction * GM82_DEG2RAD;
+        inst->hspeed += inst->gravity * cos(grav_rad);
+        inst->vspeed -= inst->gravity * sin(grav_rad);
+        inst->speed = sqrt(inst->hspeed * inst->hspeed + inst->vspeed * inst->vspeed);
+        if (inst->speed > 0.00001) {
+            inst->direction = atan2(-inst->vspeed, inst->hspeed) / GM82_DEG2RAD;
+            if (inst->direction < 0.0) inst->direction += 360.0;
+        }
+    }
+
+    if (inst->friction > 0.0 && inst->speed > 0.0) {
+        inst->speed -= inst->friction;
+        if (inst->speed < 0.0) inst->speed = 0.0;
+        double dir_rad = inst->direction * GM82_DEG2RAD;
+        inst->hspeed = inst->speed * cos(dir_rad);
+        inst->vspeed = -inst->speed * sin(dir_rad);
+    }
+
+    inst->x += inst->hspeed;
+    inst->y += inst->vspeed;
+
+    if (inst->sprite_index >= 0) {
+        inst->image_index += inst->image_speed;
+    }
+
+    gm82_instance_sync_vars_to_vm(inst);
+}
+
+static int depth_cmp(const void *a, const void *b) {
+    const gm82_instance *ia = *(const gm82_instance **)a;
+    const gm82_instance *ib = *(const gm82_instance **)b;
+    if (!ia || !ib) return 0;
+    if (ia->depth > ib->depth) return -1;
+    if (ia->depth < ib->depth) return 1;
+    return 0;
+}
+
+void gm82_event_loop_step(gm82_instance **instances, size_t count) {
+    if (!instances || count == 0) return;
+
+    // 1. Begin Step
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        gm82_instance_sync_vars_to_vm(inst);
+        if (inst->event_scripts[GM82_EVENT_BEGIN_STEP]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_BEGIN_STEP]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 2. Alarm Events
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        for (int a = 0; a < 12; a++) {
+            if (inst->alarms[a] > 0.0) {
+                inst->alarms[a] -= 1.0;
+                if (inst->alarms[a] <= 0.0) {
+                    inst->alarms[a] = -1.0;
+                    if (inst->event_scripts[GM82_EVENT_ALARM]) {
+                        gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_ALARM]);
+                        gm82_instance_sync_vars_from_vm(inst);
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Step Event
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_STEP]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_STEP]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 4. End Step Event
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_END_STEP]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_END_STEP]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 5. Motion Updates
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        gm82_instance_update_motion(inst);
+    }
+
+    // 6. Collision Events
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_COLLISION]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_COLLISION]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 7. Draw Event
+    gm82_instance **draw_order = malloc(sizeof(gm82_instance *) * count);
+    if (draw_order) {
+        memcpy(draw_order, instances, sizeof(gm82_instance *) * count);
+        qsort(draw_order, count, sizeof(gm82_instance *), depth_cmp);
+        for (size_t i = 0; i < count; i++) {
+            gm82_instance *inst = draw_order[i];
+            if (!inst || inst->destroyed || !inst->visible) continue;
+            if (inst->event_scripts[GM82_EVENT_DRAW]) {
+                gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_DRAW]);
+            }
+        }
+        free(draw_order);
+    }
+}

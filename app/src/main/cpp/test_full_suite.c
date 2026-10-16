@@ -115,6 +115,30 @@ void test_gml_builtins_suite(void) {
     gml_ast_free(ast);
     gml_value_free(&vm.return_value);
 
+    // Test dsin, dcos, angle_difference degree functions
+    const char *trig_script = "s = dsin(90); c = dcos(0); diff = angle_difference(10, 350); return s + c + diff;";
+    ok = gml_parse_program(trig_script, &ast, err, sizeof(err));
+    assert(ok);
+    gml_vm_init(&vm);
+    ok = gml_vm_execute(&vm, ast);
+    assert(ok && vm.returned);
+    assert(vm.return_value.kind == GML_V_REAL && vm.return_value.real == 22.0); // 1 + 1 + 20
+    gml_ast_free(ast);
+    gml_value_free(&vm.return_value);
+
+    // Test string_format and instance_find native calls
+    args[0] = gml_value_real(12.3456);
+    args[1] = gml_value_real(6.0);
+    args[2] = gml_value_real(2.0);
+    assert(gm82_native_call(NULL, "string_format", args, 3, &out) == 1);
+    assert(out.kind == GML_V_STRING && strstr(out.string, "12.35") != NULL);
+    gml_value_free(&out);
+
+    args[0] = gml_value_real(0.0);
+    args[1] = gml_value_real(5.0);
+    assert(gm82_native_call(NULL, "instance_find", args, 2, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 100005.0);
+
     printf("[PASS] GML Built-ins Suite\n");
 }
 
@@ -135,22 +159,27 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(inst->vspeed == -2.5);
     assert(inst->y == 97.5);
 
-    // 2. Test event loop execution
+    // 2. Test event loop execution (Keyboard, Mouse, Step)
     gml_ast *step_ast = NULL;
+    gml_ast *kbd_ast = NULL;
     char err[160] = {0};
     int ok = gml_parse_program("x += 1; y += 2;", &step_ast, err, sizeof(err));
     assert(ok);
+    ok = gml_parse_program("x += 10;", &kbd_ast, err, sizeof(err));
+    assert(ok);
 
     inst->event_scripts[GM82_EVENT_STEP] = step_ast;
+    inst->event_scripts[GM82_EVENT_KEYBOARD] = kbd_ast;
     gm82_instance *instances[1] = {inst};
     gm82_event_loop_step(instances, 1);
 
-    assert(inst->x > 104.0);
+    assert(inst->x > 114.0); // 104 + 10 (kbd) + 1 (step) = 115
 
     gml_ast_free(step_ast);
+    gml_ast_free(kbd_ast);
     gm82_instance_destroy(inst);
 
-    // 3. Test Sprite Asset and Bounding Box
+    // 3. Test Sprite Asset and Bounding Box Manual Mode
     gm82_sprite_asset *sp = gm82_sprite_asset_create(0, "spr_player", 32, 32, 16, 16, 4);
     assert(sp != NULL);
     assert(sp->width == 32 && sp->height == 32);
@@ -158,6 +187,13 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(sp->bbox_left == 0 && sp->bbox_top == 0);
     assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
     assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+
+    sp->bbox_left = 4;
+    sp->bbox_top = 4;
+    sp->bbox_right = 28;
+    sp->bbox_bottom = 28;
+    gm82_sprite_asset_compute_bbox(sp, 2);
+    assert(sp->bbox_left == 4 && sp->bbox_top == 4 && sp->bbox_right == 28 && sp->bbox_bottom == 28);
     gm82_sprite_asset_free(sp);
 
     printf("[PASS] GM82 Instance & Event Loop Suite\n");

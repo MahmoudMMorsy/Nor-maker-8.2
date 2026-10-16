@@ -24,10 +24,18 @@ else if(!strcmp(n->text,"frac")&&c==1){double v=num(a[0]);r=gml_value_real(v - (
 else if(!strcmp(n->text,"sin")&&c==1)r=gml_value_real(sin(num(a[0])));
 else if(!strcmp(n->text,"cos")&&c==1)r=gml_value_real(cos(num(a[0])));
 else if(!strcmp(n->text,"tan")&&c==1)r=gml_value_real(tan(num(a[0])));
+else if(!strcmp(n->text,"dsin")&&c==1)r=gml_value_real(sin(num(a[0])*0.017453292519943295));
+else if(!strcmp(n->text,"dcos")&&c==1)r=gml_value_real(cos(num(a[0])*0.017453292519943295));
+else if(!strcmp(n->text,"dtan")&&c==1)r=gml_value_real(tan(num(a[0])*0.017453292519943295));
 else if(!strcmp(n->text,"arcsin")&&c==1)r=gml_value_real(asin(num(a[0])));
 else if(!strcmp(n->text,"arccos")&&c==1)r=gml_value_real(acos(num(a[0])));
 else if(!strcmp(n->text,"arctan")&&c==1)r=gml_value_real(atan(num(a[0])));
 else if(!strcmp(n->text,"arctan2")&&c==2)r=gml_value_real(atan2(num(a[0]),num(a[1])));
+else if(!strcmp(n->text,"darcsin")&&c==1)r=gml_value_real(asin(num(a[0]))*57.29577951308232);
+else if(!strcmp(n->text,"darccos")&&c==1)r=gml_value_real(acos(num(a[0]))*57.29577951308232);
+else if(!strcmp(n->text,"darctan")&&c==1)r=gml_value_real(atan(num(a[0]))*57.29577951308232);
+else if(!strcmp(n->text,"darctan2")&&c==2)r=gml_value_real(atan2(num(a[0]),num(a[1]))*57.29577951308232);
+else if(!strcmp(n->text,"angle_difference")&&c==2){double diff=fmod((num(a[0])-num(a[1]))+540.0,360.0)-180.0;r=gml_value_real(diff);}
 else if(!strcmp(n->text,"exp")&&c==1)r=gml_value_real(exp(num(a[0])));
 else if(!strcmp(n->text,"log2")&&c==1)r=gml_value_real(log2(num(a[0])));
 else if(!strcmp(n->text,"log10")&&c==1)r=gml_value_real(log10(num(a[0])));
@@ -287,7 +295,21 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 3. Step Event
+    // 3. Input Events (Keyboard & Mouse)
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_KEYBOARD]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_KEYBOARD]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+        if (inst->event_scripts[GM82_EVENT_MOUSE]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_MOUSE]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 4. Step Event
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;

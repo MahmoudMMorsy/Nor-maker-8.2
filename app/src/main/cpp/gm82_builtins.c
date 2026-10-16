@@ -55,6 +55,19 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         *out = gml_value_real(found ? (double)(found - haystack + 1) : 0.0);
         return 1;
     }
+    if (!strcmp(name, "string_format") && count == 3) {
+        double val = args[0].real;
+        int tot = (int)args[1].real;
+        int dec = (int)args[2].real;
+        if (tot < 0) tot = 0;
+        if (dec < 0) dec = 0;
+        char fmt[32];
+        snprintf(fmt, sizeof(fmt), "%%%d.%df", tot, dec);
+        char buf[128];
+        snprintf(buf, sizeof(buf), fmt, val);
+        *out = gml_value_string(buf);
+        return 1;
+    }
 
     // Motion built-in functions
     if (!strcmp(name, "motion_set") && count == 2) {
@@ -70,6 +83,11 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
             gm82_instance_sync_vars_to_vm(inst);
         }
         *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "instance_find") && count == 2) {
+        int idx = (int)args[1].real;
+        *out = gml_value_real(idx >= 0 ? 100000.0 + idx : -1.0);
         return 1;
     }
     if (!strcmp(name, "motion_add") && count == 2) {

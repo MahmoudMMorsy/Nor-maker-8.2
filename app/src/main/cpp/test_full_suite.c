@@ -90,6 +90,28 @@ void test_gml_builtins_suite(void) {
     gml_value_free(&args[0]);
     gml_value_free(&args[1]);
 
+    // Test string_width and string_height
+    args[0] = gml_value_string("Test");
+    assert(gm82_native_call(NULL, "string_width", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 32.0);
+    assert(gm82_native_call(NULL, "string_height", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 16.0);
+    gml_value_free(&args[0]);
+
+    // Test drawing built-ins
+    assert(gm82_native_call(NULL, "draw_line", NULL, 0, &out) == 1);
+    assert(gm82_native_call(NULL, "draw_rectangle", NULL, 0, &out) == 1);
+    assert(gm82_native_call(NULL, "draw_circle", NULL, 0, &out) == 1);
+
+    // Test position_meeting and instance_position
+    args[0] = gml_value_real(100.0);
+    args[1] = gml_value_real(100.0);
+    args[2] = gml_value_real(0.0);
+    assert(gm82_native_call(NULL, "position_meeting", args, 3, &out) == 1);
+    assert(out.kind == GML_V_BOOL && out.boolean == 0);
+    assert(gm82_native_call(NULL, "instance_position", args, 3, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == -4.0);
+
     // Test string_digits("Stage 12 Score 450") == "12450" via GML VM script execution
     const char *dig_script = "s = 'Stage 12 Score 450'; return string_digits(s);";
     gml_ast *ast = NULL;
@@ -134,6 +156,15 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(inst->x == 104.0);
     assert(inst->vspeed == -2.5);
     assert(inst->y == 97.5);
+
+    // Test motion_set via native built-in call
+    gml_value args[2];
+    gml_value out;
+    args[0] = gml_value_real(0.0); // right
+    args[1] = gml_value_real(5.0); // speed 5
+    gm82_native_call(inst, "motion_set", args, 2, &out);
+    assert(inst->speed == 5.0 && inst->direction == 0.0);
+    assert(inst->hspeed == 5.0 && inst->vspeed == 0.0);
 
     // 2. Test event loop execution
     gml_ast *step_ast = NULL;

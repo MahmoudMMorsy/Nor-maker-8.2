@@ -28,6 +28,13 @@ else if(!strcmp(n->text,"arcsin")&&c==1)r=gml_value_real(asin(num(a[0])));
 else if(!strcmp(n->text,"arccos")&&c==1)r=gml_value_real(acos(num(a[0])));
 else if(!strcmp(n->text,"arctan")&&c==1)r=gml_value_real(atan(num(a[0])));
 else if(!strcmp(n->text,"arctan2")&&c==2)r=gml_value_real(atan2(num(a[0]),num(a[1])));
+else if(!strcmp(n->text,"dsin")&&c==1)r=gml_value_real(sin(num(a[0])*3.14159265358979323846/180.0));
+else if(!strcmp(n->text,"dcos")&&c==1)r=gml_value_real(cos(num(a[0])*3.14159265358979323846/180.0));
+else if(!strcmp(n->text,"dtan")&&c==1)r=gml_value_real(tan(num(a[0])*3.14159265358979323846/180.0));
+else if(!strcmp(n->text,"darcsin")&&c==1)r=gml_value_real(asin(num(a[0]))*180.0/3.14159265358979323846);
+else if(!strcmp(n->text,"darccos")&&c==1)r=gml_value_real(acos(num(a[0]))*180.0/3.14159265358979323846);
+else if(!strcmp(n->text,"darctan")&&c==1)r=gml_value_real(atan(num(a[0]))*180.0/3.14159265358979323846);
+else if(!strcmp(n->text,"darctan2")&&c==2)r=gml_value_real(atan2(num(a[0]),num(a[1]))*180.0/3.14159265358979323846);
 else if(!strcmp(n->text,"exp")&&c==1)r=gml_value_real(exp(num(a[0])));
 else if(!strcmp(n->text,"log2")&&c==1)r=gml_value_real(log2(num(a[0])));
 else if(!strcmp(n->text,"log10")&&c==1)r=gml_value_real(log10(num(a[0])));
@@ -76,6 +83,8 @@ else if(!strcmp(n->text,"is_array")&&c==1){r=gml_value_bool(a[0].kind==GML_V_ARR
 else if(!strcmp(n->text,"is_undefined")&&c==1){r=gml_value_bool(a[0].kind==GML_V_UNDEFINED);}
 else if(!strcmp(n->text,"typeof")&&c==1){switch(a[0].kind){case GML_V_REAL:r=gml_value_string("number");break;case GML_V_BOOL:r=gml_value_string("bool");break;case GML_V_STRING:r=gml_value_string("string");break;case GML_V_ARRAY:r=gml_value_string("array");break;default:r=gml_value_string("undefined");break;}}
 else if(!strcmp(n->text,"string_replace_all")&&c==3){const char*src=text_of(a[0]);const char*find=text_of(a[1]);const char*rep=text_of(a[2]);size_t nf=strlen(find),nr=strlen(rep),ns=strlen(src);if(nf==0)r=gml_value_string(src);else{size_t occurrences=0;for(const char*p=src;(p=strstr(p,find));p+=nf)occurrences++;size_t outlen=ns;if(nr>=nf)outlen += occurrences*(nr-nf);else outlen -= occurrences*(nf-nr);char*buf=malloc(outlen+1);if(buf){const char*p=src;char*w=buf;while(*p){const char*q=strstr(p,find);if(!q){strcpy(w,p);break;}size_t n=(size_t)(q-p);memcpy(w,p,n);w+=n;memcpy(w,rep,nr);w+=nr;p=q+nf;}buf[outlen]=0;r=gml_value_string(buf);free(buf);}}}
+else if(!strcmp(n->text,"string_replace")&&c==3){const char*src=text_of(a[0]);const char*find=text_of(a[1]);const char*rep=text_of(a[2]);const char*p=strstr(src,find);if(!p||!find[0])r=gml_value_string(src);else{size_t prefix_len=(size_t)(p-src);size_t find_len=strlen(find);size_t rep_len=strlen(rep);size_t rest_len=strlen(p+find_len);char*buf=malloc(prefix_len+rep_len+rest_len+1);if(buf){memcpy(buf,src,prefix_len);memcpy(buf+prefix_len,rep,rep_len);memcpy(buf+prefix_len+rep_len,p+find_len,rest_len+1);r=gml_value_string(buf);free(buf);}}}
+else if(!strcmp(n->text,"string_format")&&c==3){char buf[64];int total=(int)num(a[1]),dec=(int)num(a[2]);if(total<0)total=0;if(dec<0)dec=0;snprintf(buf,sizeof buf,"%*.*f",total,dec,num(a[0]));r=gml_value_string(buf);}
 else if(vm->native_call && vm->native_call(vm->native_userdata,n->text,a,c,&r)){}
 else if(vm->script_call && vm->script_call(vm->script_userdata,n->text,a,c,&r)){}
 else snprintf(vm->error,sizeof vm->error,"unknown function: %s",n->text);
@@ -108,6 +117,13 @@ int gml_vm_execute(gml_vm*vm,const gml_ast*root){if(!vm||!root)return 0;vm->erro
 
 void gm82_instance_sync_vars_to_vm(gm82_instance *inst) {
     if (!inst) return;
+    double sw = inst->sprite_width > 0 ? inst->sprite_width : 32.0;
+    double sh = inst->sprite_height > 0 ? inst->sprite_height : 32.0;
+    inst->bbox_left = inst->x - inst->sprite_xoffset;
+    inst->bbox_top = inst->y - inst->sprite_yoffset;
+    inst->bbox_right = inst->bbox_left + sw * inst->image_xscale - 1.0;
+    inst->bbox_bottom = inst->bbox_top + sh * inst->image_yscale - 1.0;
+
     gml_vm_set(&inst->vm, "x", gml_value_real(inst->x));
     gml_vm_set(&inst->vm, "y", gml_value_real(inst->y));
     gml_vm_set(&inst->vm, "xprevious", gml_value_real(inst->xprevious));
@@ -133,6 +149,15 @@ void gm82_instance_sync_vars_to_vm(gm82_instance *inst) {
     gml_vm_set(&inst->vm, "image_alpha", gml_value_real(inst->image_alpha));
     gml_vm_set(&inst->vm, "image_xscale", gml_value_real(inst->image_xscale));
     gml_vm_set(&inst->vm, "image_yscale", gml_value_real(inst->image_yscale));
+    gml_vm_set(&inst->vm, "bbox_left", gml_value_real(inst->bbox_left));
+    gml_vm_set(&inst->vm, "bbox_top", gml_value_real(inst->bbox_top));
+    gml_vm_set(&inst->vm, "bbox_right", gml_value_real(inst->bbox_right));
+    gml_vm_set(&inst->vm, "bbox_bottom", gml_value_real(inst->bbox_bottom));
+    gml_vm_set(&inst->vm, "sprite_width", gml_value_real(sw));
+    gml_vm_set(&inst->vm, "sprite_height", gml_value_real(sh));
+    gml_vm_set(&inst->vm, "sprite_xoffset", gml_value_real(inst->sprite_xoffset));
+    gml_vm_set(&inst->vm, "sprite_yoffset", gml_value_real(inst->sprite_yoffset));
+    gml_vm_set(&inst->vm, "image_number", gml_value_real(inst->image_number > 0 ? inst->image_number : 1.0));
     gml_vm_set(&inst->vm, "id", gml_value_real((double)inst->id));
     gml_vm_set(&inst->vm, "object_index", gml_value_real((double)inst->object_index));
 }
@@ -284,6 +309,26 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
                     }
                 }
             }
+        }
+    }
+
+    // 2b. Keyboard Events
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_KEYBOARD]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_KEYBOARD]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 2c. Mouse Events
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_MOUSE]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_MOUSE]);
+            gm82_instance_sync_vars_from_vm(inst);
         }
     }
 

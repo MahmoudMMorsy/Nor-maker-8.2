@@ -72,6 +72,46 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         *out = gml_value_real(1.0);
         return 1;
     }
+    if (!strcmp(name, "move_towards_point") && count == 3) {
+        double tx = args[0].real;
+        double ty = args[1].real;
+        double spd = args[2].real;
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            double dx = tx - inst->x;
+            double dy = ty - inst->y;
+            double dir = atan2(-dy, dx) * 180.0 / 3.14159265358979323846;
+            if (dir < 0) dir += 360.0;
+            double rad = dir * 0.017453292519943295;
+            inst->direction = dir;
+            inst->speed = spd;
+            inst->hspeed = spd * cos(rad);
+            inst->vspeed = -spd * sin(rad);
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "sprite_get_width") && count == 1) {
+        *out = gml_value_real(32.0);
+        return 1;
+    }
+    if (!strcmp(name, "sprite_get_height") && count == 1) {
+        *out = gml_value_real(32.0);
+        return 1;
+    }
+    if (!strcmp(name, "sprite_get_xoffset") && count == 1) {
+        *out = gml_value_real(0.0);
+        return 1;
+    }
+    if (!strcmp(name, "sprite_get_yoffset") && count == 1) {
+        *out = gml_value_real(0.0);
+        return 1;
+    }
+    if (!strcmp(name, "sprite_get_number") && count == 1) {
+        *out = gml_value_real(1.0);
+        return 1;
+    }
     if (!strcmp(name, "motion_add") && count == 2) {
         double dir = args[0].real;
         double spd = args[1].real;

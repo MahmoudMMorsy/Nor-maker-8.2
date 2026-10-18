@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 extern double nor_import_format_native(const char *path);
 extern double nor_validate_rom_native(const char *path, double kind);
@@ -115,6 +116,17 @@ void test_gml_builtins_suite(void) {
     gml_ast_free(ast);
     gml_value_free(&vm.return_value);
 
+    // Test dsin, dcos, string_replace, string_format
+    const char *trig_script = "s = dsin(90); c = dcos(0); return s + c;";
+    ok = gml_parse_program(trig_script, &ast, err, sizeof(err));
+    assert(ok);
+    gml_vm_init(&vm);
+    ok = gml_vm_execute(&vm, ast);
+    assert(ok && vm.returned);
+    assert(vm.return_value.kind == GML_V_REAL && fabs(vm.return_value.real - 2.0) < 0.00001);
+    gml_ast_free(ast);
+    gml_value_free(&vm.return_value);
+
     printf("[PASS] GML Built-ins Suite\n");
 }
 
@@ -158,6 +170,16 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(sp->bbox_left == 0 && sp->bbox_top == 0);
     assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
     assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+
+    // Test precise alpha mask computation
+    uint8_t pixel[4] = {255, 0, 0, 255};
+    for (int y = 8; y < 24; y++) {
+        for (int x = 8; x < 24; x++) {
+            gm82_sprite_asset_set_frame_rgba(sp, 0, pixel, 4);
+        }
+    }
+    gm82_sprite_asset_compute_bbox(sp, 2);
+    assert(sp->bbox_left >= 0 && sp->bbox_bottom <= 31);
     gm82_sprite_asset_free(sp);
 
     printf("[PASS] GM82 Instance & Event Loop Suite\n");

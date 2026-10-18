@@ -60,12 +60,60 @@ gm82_sprite_asset *gm82_sprite_asset_create(int id, const char *name, int w, int
 
 void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode) {
     if (!sprite) return;
-    if (bbox_mode == 0 || bbox_mode == 1) { // Auto or Full image
+    if (bbox_mode == 0 || bbox_mode == 1 || !sprite->strip_surface_rgba) {
         sprite->bbox_left = 0;
         sprite->bbox_top = 0;
-        sprite->bbox_right = sprite->width - 1;
-        sprite->bbox_bottom = sprite->height - 1;
+        sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
+        sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
+        return;
     }
+
+    if (bbox_mode == 2) {
+        int min_x = sprite->width, min_y = sprite->height;
+        int max_x = -1, max_y = -1;
+        int sub_count = sprite->subimage_count > 0 ? sprite->subimage_count : 1;
+
+        for (int frame = 0; frame < sub_count; frame++) {
+            size_t frame_offset = (size_t)frame * (size_t)sprite->width * (size_t)sprite->height * 4;
+            for (int y = 0; y < sprite->height; y++) {
+                for (int x = 0; x < sprite->width; x++) {
+                    size_t idx = frame_offset + ((size_t)y * (size_t)sprite->width + (size_t)x) * 4;
+                    if (idx + 3 < sprite->strip_surface_size) {
+                        uint8_t alpha = sprite->strip_surface_rgba[idx + 3];
+                        if (alpha > 0) {
+                            if (x < min_x) min_x = x;
+                            if (x > max_x) max_x = x;
+                            if (y < min_y) min_y = y;
+                            if (y > max_y) max_y = y;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (max_x >= min_x && max_y >= min_y) {
+            sprite->bbox_left = min_x;
+            sprite->bbox_right = max_x;
+            sprite->bbox_top = min_y;
+            sprite->bbox_bottom = max_y;
+        } else {
+            sprite->bbox_left = 0;
+            sprite->bbox_top = 0;
+            sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
+            sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
+        }
+    }
+}
+
+int gm82_sprite_asset_set_frame_rgba(gm82_sprite_asset *sprite, int frame, const uint8_t *rgba, size_t size) {
+    if (!sprite || !rgba || !sprite->strip_surface_rgba) return 0;
+    if (frame < 0 || frame >= sprite->subimage_count) return 0;
+    size_t frame_bytes = (size_t)sprite->width * (size_t)sprite->height * 4;
+    size_t offset = (size_t)frame * frame_bytes;
+    if (offset + frame_bytes > sprite->strip_surface_size) return 0;
+    size_t copy_len = size < frame_bytes ? size : frame_bytes;
+    memcpy(sprite->strip_surface_rgba + offset, rgba, copy_len);
+    return 1;
 }
 
 void gm82_sprite_asset_free(gm82_sprite_asset *sprite) {

@@ -150,7 +150,33 @@ void test_gm82_instance_and_event_loop_suite(void) {
     gml_ast_free(step_ast);
     gm82_instance_destroy(inst);
 
-    // 3. Test Sprite Asset and Bounding Box
+    // 3. Test Event execution sequence (Begin Step -> Alarm countdown -> Step -> End Step)
+    gm82_instance *inst_seq = gm82_instance_create(100002, 2, 0.0, 0.0);
+    inst_seq->alarms[0] = 1.0;
+
+    gml_ast *begin_ast = NULL, *alarm_ast = NULL, *end_ast = NULL;
+    assert(gml_parse_program("x += 10;", &begin_ast, err, sizeof(err)));
+    assert(gml_parse_program("y += 100;", &alarm_ast, err, sizeof(err)));
+    assert(gml_parse_program("x += 5;", &end_ast, err, sizeof(err)));
+
+    inst_seq->event_scripts[GM82_EVENT_BEGIN_STEP] = begin_ast;
+    inst_seq->event_scripts[GM82_EVENT_ALARM] = alarm_ast;
+    inst_seq->event_scripts[GM82_EVENT_END_STEP] = end_ast;
+
+    gm82_instance *seq_instances[1] = {inst_seq};
+    gm82_event_loop_step(seq_instances, 1);
+
+    // x had 10 added in begin step, then 5 added in end step -> x == 15
+    // y had 100 added in alarm event (alarm[0] was 1, triggered) -> y == 100
+    assert(inst_seq->x == 15.0);
+    assert(inst_seq->y == 100.0);
+
+    gml_ast_free(begin_ast);
+    gml_ast_free(alarm_ast);
+    gml_ast_free(end_ast);
+    gm82_instance_destroy(inst_seq);
+
+    // 4. Test Sprite Asset and Bounding Box
     gm82_sprite_asset *sp = gm82_sprite_asset_create(0, "spr_player", 32, 32, 16, 16, 4);
     assert(sp != NULL);
     assert(sp->width == 32 && sp->height == 32);
@@ -158,6 +184,16 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(sp->bbox_left == 0 && sp->bbox_top == 0);
     assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
     assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+
+    // Set non-zero alpha in middle region (x: 4..12, y: 8..20) and verify tight scan mode 0
+    size_t pixel_idx = (size_t)(8 * 32 + 4) * 4 + 3;
+    sp->strip_surface_rgba[pixel_idx] = 255;
+    pixel_idx = (size_t)(20 * 32 + 12) * 4 + 3;
+    sp->strip_surface_rgba[pixel_idx] = 255;
+    gm82_sprite_asset_compute_bbox(sp, 0);
+    assert(sp->bbox_left == 4 && sp->bbox_top == 8);
+    assert(sp->bbox_right == 12 && sp->bbox_bottom == 20);
+
     gm82_sprite_asset_free(sp);
 
     printf("[PASS] GM82 Instance & Event Loop Suite\n");

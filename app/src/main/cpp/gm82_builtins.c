@@ -114,7 +114,7 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
     }
 
     // Drawing & Text built-ins
-    if ((!strcmp(name, "draw_sprite") || !strcmp(name, "draw_sprite_ext") || !strcmp(name, "draw_text"))) {
+    if (!strcmp(name, "draw_sprite") || !strcmp(name, "draw_sprite_ext") || !strcmp(name, "draw_text") || !strcmp(name, "draw_self") || !strcmp(name, "draw_set_color") || !strcmp(name, "draw_set_alpha")) {
         *out = gml_value_real(1.0);
         return 1;
     }
@@ -125,6 +125,23 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
     }
     if (!strcmp(name, "string_height") && count == 1) {
         *out = gml_value_real(16.0); // 16px font height
+        return 1;
+    }
+
+    // Distance & Input queries
+    if (!strcmp(name, "distance_to_point") && count == 2 && userdata) {
+        gm82_instance *inst = (gm82_instance *)userdata;
+        double dx = args[0].real - inst->x;
+        double dy = args[1].real - inst->y;
+        *out = gml_value_real(sqrt(dx * dx + dy * dy));
+        return 1;
+    }
+    if (!strcmp(name, "keyboard_check") || !strcmp(name, "keyboard_check_pressed") || !strcmp(name, "keyboard_check_released")) {
+        *out = gml_value_bool(0);
+        return 1;
+    }
+    if (!strcmp(name, "mouse_check_button") || !strcmp(name, "mouse_check_button_pressed")) {
+        *out = gml_value_bool(0);
         return 1;
     }
 

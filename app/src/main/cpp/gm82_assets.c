@@ -60,11 +60,46 @@ gm82_sprite_asset *gm82_sprite_asset_create(int id, const char *name, int w, int
 
 void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode) {
     if (!sprite) return;
-    if (bbox_mode == 0 || bbox_mode == 1) { // Auto or Full image
+    if (bbox_mode == 1) { // Full image
         sprite->bbox_left = 0;
         sprite->bbox_top = 0;
         sprite->bbox_right = sprite->width - 1;
         sprite->bbox_bottom = sprite->height - 1;
+    } else if (bbox_mode == 0) { // Automatic tight scan
+        if (sprite->strip_surface_rgba && sprite->width > 0 && sprite->height > 0) {
+            int min_x = sprite->width, max_x = 0;
+            int min_y = sprite->height, max_y = 0;
+            int found = 0;
+            for (int y = 0; y < sprite->height; y++) {
+                for (int x = 0; x < sprite->width; x++) {
+                    // Check alpha byte (4th byte in RGBA)
+                    size_t idx = (size_t)(y * sprite->width + x) * 4 + 3;
+                    if (idx < sprite->strip_surface_size && sprite->strip_surface_rgba[idx] > 0) {
+                        if (x < min_x) min_x = x;
+                        if (x > max_x) max_x = x;
+                        if (y < min_y) min_y = y;
+                        if (y > max_y) max_y = y;
+                        found = 1;
+                    }
+                }
+            }
+            if (found) {
+                sprite->bbox_left = min_x;
+                sprite->bbox_top = min_y;
+                sprite->bbox_right = max_x;
+                sprite->bbox_bottom = max_y;
+            } else {
+                sprite->bbox_left = 0;
+                sprite->bbox_top = 0;
+                sprite->bbox_right = sprite->width - 1;
+                sprite->bbox_bottom = sprite->height - 1;
+            }
+        } else {
+            sprite->bbox_left = 0;
+            sprite->bbox_top = 0;
+            sprite->bbox_right = sprite->width - 1;
+            sprite->bbox_bottom = sprite->height - 1;
+        }
     }
 }
 

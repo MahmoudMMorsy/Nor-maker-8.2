@@ -287,7 +287,21 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 3. Step Event
+    // 3. Keyboard & Mouse Events
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_KEYBOARD]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_KEYBOARD]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+        if (inst->event_scripts[GM82_EVENT_MOUSE]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_MOUSE]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 4. Step Event
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
@@ -297,7 +311,14 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 4. End Step Event
+    // 5. Motion Updates
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        gm82_instance_update_motion(inst);
+    }
+
+    // 6. End Step Event
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
@@ -305,13 +326,6 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
             gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_END_STEP]);
             gm82_instance_sync_vars_from_vm(inst);
         }
-    }
-
-    // 5. Motion Updates
-    for (size_t i = 0; i < count; i++) {
-        gm82_instance *inst = instances[i];
-        if (!inst || inst->destroyed) continue;
-        gm82_instance_update_motion(inst);
     }
 
     // 6. Collision Events

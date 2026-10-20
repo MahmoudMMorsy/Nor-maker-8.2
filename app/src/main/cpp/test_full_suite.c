@@ -115,6 +115,27 @@ void test_gml_builtins_suite(void) {
     gml_ast_free(ast);
     gml_value_free(&vm.return_value);
 
+    // Test motion_set and motion_add built-ins
+    gm82_instance *inst = gm82_instance_create(1001, 1, 0.0, 0.0);
+    args[0] = gml_value_real(0.0);   // direction
+    args[1] = gml_value_real(5.0);   // speed
+    assert(gm82_native_call(inst, "motion_set", args, 2, &out) == 1);
+    assert(inst->hspeed == 5.0 && inst->vspeed == 0.0);
+
+    args[0] = gml_value_real(90.0);  // direction
+    args[1] = gml_value_real(5.0);   // speed
+    assert(gm82_native_call(inst, "motion_add", args, 2, &out) == 1);
+    assert(inst->hspeed == 5.0 && inst->vspeed == -5.0);
+    gm82_instance_destroy(inst);
+
+    // Test string dimensions
+    args[0] = gml_value_string("GML");
+    assert(gm82_native_call(NULL, "string_width", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 24.0);
+    assert(gm82_native_call(NULL, "string_height", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 16.0);
+    gml_value_free(&args[0]);
+
     printf("[PASS] GML Built-ins Suite\n");
 }
 
@@ -158,6 +179,15 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(sp->bbox_left == 0 && sp->bbox_top == 0);
     assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
     assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+
+    // Test precise alpha bounding box calculation (bbox_mode == 2)
+    // Set a non-zero alpha pixel at (10, 12)
+    sp->strip_surface_rgba[(12 * 32 + 10) * 4 + 3] = 255;
+    sp->strip_surface_rgba[(20 * 32 + 25) * 4 + 3] = 255;
+    gm82_sprite_asset_compute_bbox(sp, 2);
+    assert(sp->bbox_left == 10 && sp->bbox_top == 12);
+    assert(sp->bbox_right == 25 && sp->bbox_bottom == 20);
+
     gm82_sprite_asset_free(sp);
 
     printf("[PASS] GM82 Instance & Event Loop Suite\n");

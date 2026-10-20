@@ -65,6 +65,36 @@ void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode) {
         sprite->bbox_top = 0;
         sprite->bbox_right = sprite->width - 1;
         sprite->bbox_bottom = sprite->height - 1;
+    } else if (bbox_mode == 2 && sprite->strip_surface_rgba) { // Precise alpha channel scan
+        int min_x = sprite->width, min_y = sprite->height;
+        int max_x = -1, max_y = -1;
+        int frame_pixels = sprite->width * sprite->height;
+
+        for (int frame = 0; frame < sprite->subimage_count; frame++) {
+            const uint8_t *rgba = sprite->strip_surface_rgba + (frame * frame_pixels * 4);
+            for (int y = 0; y < sprite->height; y++) {
+                for (int x = 0; x < sprite->width; x++) {
+                    uint8_t alpha = rgba[(y * sprite->width + x) * 4 + 3];
+                    if (alpha > 0) {
+                        if (x < min_x) min_x = x;
+                        if (x > max_x) max_x = x;
+                        if (y < min_y) min_y = y;
+                        if (y > max_y) max_y = y;
+                    }
+                }
+            }
+        }
+        if (max_x >= 0 && max_y >= 0) {
+            sprite->bbox_left = min_x;
+            sprite->bbox_right = max_x;
+            sprite->bbox_top = min_y;
+            sprite->bbox_bottom = max_y;
+        } else {
+            sprite->bbox_left = 0;
+            sprite->bbox_top = 0;
+            sprite->bbox_right = sprite->width - 1;
+            sprite->bbox_bottom = sprite->height - 1;
+        }
     }
 }
 

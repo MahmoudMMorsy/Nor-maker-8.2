@@ -154,6 +154,23 @@ static void add_item(gml_ast *parent, gml_ast *child) {
     }
 }
 
+static gml_ast *gml_ast_clone(const gml_ast *src) {
+    if (!src) return NULL;
+    gml_ast *dst = make_node(src->kind);
+    if (!dst) return NULL;
+    dst->op = src->op;
+    dst->number = src->number;
+    if (src->text) dst->text = strdup(src->text);
+    dst->left = gml_ast_clone(src->left);
+    dst->right = gml_ast_clone(src->right);
+    if (src->count > 0 && src->items) {
+        for (size_t i = 0; i < src->count; i++) {
+            add_item(dst, gml_ast_clone(src->items[i]));
+        }
+    }
+    return dst;
+}
+
 static gml_ast *parse_expr(parser *p);
 static gml_ast *parse_stmt(parser *p);
 
@@ -467,19 +484,7 @@ static gml_ast *parse_stmt(parser *p) {
             else if (op_str[0] == '*') bin->op = GML_T_STAR;
             else if (op_str[0] == '/') bin->op = GML_T_SLASH;
 
-            // Deep clone left for bin->left
-            gml_ast *cloned_left = make_node(e->kind);
-            if (e->text) cloned_left->text = strdup(e->text);
-            if (e->left) {
-                cloned_left->left = make_node(e->left->kind);
-                if (e->left->text) cloned_left->left->text = strdup(e->left->text);
-            }
-            if (e->right) {
-                cloned_left->right = make_node(e->right->kind);
-                if (e->right->text) cloned_left->right->text = strdup(e->right->text);
-            }
-
-            bin->left = cloned_left;
+            bin->left = gml_ast_clone(e);
             bin->right = rhs;
             rhs = bin;
         }

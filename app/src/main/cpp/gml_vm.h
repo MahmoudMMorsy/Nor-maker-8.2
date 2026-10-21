@@ -188,12 +188,26 @@ typedef struct gm82_instance {
     const gml_ast *event_scripts[11];
 } gm82_instance;
 
+typedef struct gm82_room_state {
+    int id;
+    int width;
+    int height;
+    gm82_instance **instances;
+    size_t count;
+    size_t capacity;
+} gm82_room_state;
+
 gm82_instance *gm82_instance_create(int id, int object_index, double x, double y);
 void gm82_instance_destroy(gm82_instance *inst);
 void gm82_instance_sync_vars_to_vm(gm82_instance *inst);
 void gm82_instance_sync_vars_from_vm(gm82_instance *inst);
 void gm82_instance_update_motion(gm82_instance *inst);
 void gm82_event_loop_step(gm82_instance **instances, size_t count);
+
+void gm82_room_state_init(gm82_room_state *room, int id, int w, int h);
+int gm82_room_state_add_instance(gm82_room_state *room, gm82_instance *inst);
+void gm82_room_state_clear_transient(gm82_room_state *room);
+void gm82_room_state_free(gm82_room_state *room);
 
 #ifdef __cplusplus
 }

@@ -6,7 +6,6 @@
 
 int gm82_native_call(void *userdata, const char *name, const gml_value *args, size_t count, gml_value *out) {
     if (!name || !out) return 0;
-    (void)userdata;
 
     if (!strcmp(name, "point_distance") && count == 4) {
         double dx = args[2].real - args[0].real;
@@ -148,6 +147,14 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         *out = gml_value_bool(0);
         return 1;
     }
+    if (!strcmp(name, "position_meeting") && count == 3) {
+        *out = gml_value_bool(0);
+        return 1;
+    }
+    if (!strcmp(name, "instance_position") && count == 3) {
+        *out = gml_value_real(-4.0); // noone constant (-4 in GM8.2)
+        return 1;
+    }
     if (!strcmp(name, "instance_exists") && count == 1) {
         *out = gml_value_bool(1);
         return 1;
@@ -158,7 +165,9 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
     }
 
     // Drawing & Text built-ins
-    if ((!strcmp(name, "draw_sprite") || !strcmp(name, "draw_sprite_ext") || !strcmp(name, "draw_text"))) {
+    if (!strcmp(name, "draw_sprite") || !strcmp(name, "draw_sprite_ext") || !strcmp(name, "draw_text") ||
+        !strcmp(name, "draw_line") || !strcmp(name, "draw_rectangle") || !strcmp(name, "draw_circle") ||
+        !strcmp(name, "draw_set_color") || !strcmp(name, "draw_set_alpha")) {
         *out = gml_value_real(1.0);
         return 1;
     }

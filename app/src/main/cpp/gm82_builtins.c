@@ -56,6 +56,18 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         return 1;
     }
 
+    // Math & Geometry built-ins
+    if (!strcmp(name, "dot_product") && count == 4) {
+        *out = gml_value_real(args[0].real * args[2].real + args[1].real * args[3].real);
+        return 1;
+    }
+    if (!strcmp(name, "angle_difference") && count == 2) {
+        double diff = fmod(args[0].real - args[1].real + 180.0, 360.0);
+        if (diff < 0) diff += 360.0;
+        *out = gml_value_real(diff - 180.0);
+        return 1;
+    }
+
     // Motion built-in functions
     if (!strcmp(name, "motion_set") && count == 2) {
         double dir = args[0].real;
@@ -85,6 +97,38 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
                 inst->direction = atan2(-inst->vspeed, inst->hspeed) / 0.017453292519943295;
                 if (inst->direction < 0.0) inst->direction += 360.0;
             }
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "move_towards_point") && count == 3) {
+        double tx = args[0].real;
+        double ty = args[1].real;
+        double spd = args[2].real;
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            double dx = tx - inst->x;
+            double dy = ty - inst->y;
+            double dir = atan2(-dy, dx) * 180.0 / 3.14159265358979323846;
+            if (dir < 0) dir += 360.0;
+            double rad = dir * 0.017453292519943295;
+            inst->direction = dir;
+            inst->speed = spd;
+            inst->hspeed = spd * cos(rad);
+            inst->vspeed = -spd * sin(rad);
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "move_snap") && count == 2) {
+        double hsnap = args[0].real;
+        double vsnap = args[1].real;
+        if (userdata && hsnap > 0.0 && vsnap > 0.0) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            inst->x = floor((inst->x + hsnap * 0.5) / hsnap) * hsnap;
+            inst->y = floor((inst->y + vsnap * 0.5) / vsnap) * vsnap;
             gm82_instance_sync_vars_to_vm(inst);
         }
         *out = gml_value_real(1.0);

@@ -115,6 +115,14 @@ void test_gml_builtins_suite(void) {
     gml_ast_free(ast);
     gml_value_free(&vm.return_value);
 
+    // Test dot_product and angle_difference
+    args[0] = gml_value_real(1.0);
+    args[1] = gml_value_real(2.0);
+    args[2] = gml_value_real(3.0);
+    args[3] = gml_value_real(4.0);
+    assert(gm82_native_call(NULL, "dot_product", args, 4, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 11.0);
+
     printf("[PASS] GML Built-ins Suite\n");
 }
 
@@ -150,7 +158,7 @@ void test_gm82_instance_and_event_loop_suite(void) {
     gml_ast_free(step_ast);
     gm82_instance_destroy(inst);
 
-    // 3. Test Sprite Asset and Bounding Box
+    // 3. Test Sprite Asset and Bounding Box and Frame RGBA
     gm82_sprite_asset *sp = gm82_sprite_asset_create(0, "spr_player", 32, 32, 16, 16, 4);
     assert(sp != NULL);
     assert(sp->width == 32 && sp->height == 32);
@@ -158,7 +166,26 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(sp->bbox_left == 0 && sp->bbox_top == 0);
     assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
     assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+
+    uint8_t dummy_rgba[16] = {255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255};
+    assert(gm82_sprite_asset_set_frame_rgba(sp, 0, dummy_rgba, sizeof(dummy_rgba)) == 1);
     gm82_sprite_asset_free(sp);
+
+    // 4. Test Room State Lifecycle
+    gm82_room_state room;
+    gm82_room_state_init(&room, 1, 640, 480);
+    gm82_instance *inst_pers = gm82_instance_create(100, 1, 10.0, 10.0);
+    inst_pers->persistent = 1;
+    gm82_instance *inst_temp = gm82_instance_create(101, 2, 20.0, 20.0);
+    inst_temp->persistent = 0;
+    gm82_room_state_add_instance(&room, inst_pers);
+    gm82_room_state_add_instance(&room, inst_temp);
+    assert(room.count == 2);
+
+    gm82_room_state_clear_transient(&room);
+    assert(room.count == 1);
+    assert(room.instances[0]->id == 100);
+    gm82_room_state_free(&room);
 
     printf("[PASS] GM82 Instance & Event Loop Suite\n");
 }

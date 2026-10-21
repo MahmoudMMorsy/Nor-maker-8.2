@@ -63,9 +63,19 @@ void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode) {
     if (bbox_mode == 0 || bbox_mode == 1) { // Auto or Full image
         sprite->bbox_left = 0;
         sprite->bbox_top = 0;
-        sprite->bbox_right = sprite->width - 1;
-        sprite->bbox_bottom = sprite->height - 1;
+        sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
+        sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
     }
+}
+
+int gm82_sprite_asset_set_frame_rgba(gm82_sprite_asset *sprite, int frame, const uint8_t *rgba, size_t len) {
+    if (!sprite || !sprite->strip_surface_rgba || frame < 0 || frame >= sprite->subimage_count || !rgba) return 0;
+    size_t frame_bytes = (size_t)sprite->width * (size_t)sprite->height * 4;
+    size_t offset = (size_t)frame * frame_bytes;
+    if (offset + frame_bytes > sprite->strip_surface_size) return 0;
+    size_t copy_bytes = len < frame_bytes ? len : frame_bytes;
+    memcpy(sprite->strip_surface_rgba + offset, rgba, copy_bytes);
+    return 1;
 }
 
 void gm82_sprite_asset_free(gm82_sprite_asset *sprite) {

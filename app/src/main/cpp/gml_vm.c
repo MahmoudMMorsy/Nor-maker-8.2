@@ -135,6 +135,12 @@ void gm82_instance_sync_vars_to_vm(gm82_instance *inst) {
     gml_vm_set(&inst->vm, "image_yscale", gml_value_real(inst->image_yscale));
     gml_vm_set(&inst->vm, "id", gml_value_real((double)inst->id));
     gml_vm_set(&inst->vm, "object_index", gml_value_real((double)inst->object_index));
+
+    char alarm_name[16];
+    for (int i = 0; i < 12; i++) {
+        snprintf(alarm_name, sizeof(alarm_name), "alarm%d", i);
+        gml_vm_set(&inst->vm, alarm_name, gml_value_real(inst->alarms[i]));
+    }
 }
 
 void gm82_instance_sync_vars_from_vm(gm82_instance *inst) {
@@ -165,6 +171,16 @@ void gm82_instance_sync_vars_from_vm(gm82_instance *inst) {
     inst->image_alpha = num(gml_vm_get(&inst->vm, "image_alpha"));
     inst->image_xscale = num(gml_vm_get(&inst->vm, "image_xscale"));
     inst->image_yscale = num(gml_vm_get(&inst->vm, "image_yscale"));
+
+    char alarm_name[16];
+    for (int i = 0; i < 12; i++) {
+        snprintf(alarm_name, sizeof(alarm_name), "alarm%d", i);
+        gml_value al = gml_vm_get(&inst->vm, alarm_name);
+        if (al.kind != GML_V_UNDEFINED) {
+            inst->alarms[i] = num(al);
+        }
+        gml_value_free(&al);
+    }
 
     // Recalculate speed/direction if hspeed/vspeed changed
     if (inst->hspeed != old_hs || inst->vspeed != old_vs) {
@@ -287,7 +303,21 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 3. Step Event
+    // 3. Keyboard & Mouse Input Events
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_KEYBOARD]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_KEYBOARD]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+        if (inst->event_scripts[GM82_EVENT_MOUSE]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_MOUSE]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 4. Step Event
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
@@ -297,7 +327,7 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 4. End Step Event
+    // 5. End Step Event
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
@@ -307,14 +337,14 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 5. Motion Updates
+    // 6. Motion Updates
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
         gm82_instance_update_motion(inst);
     }
 
-    // 6. Collision Events
+    // 7. Collision Events
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
@@ -324,7 +354,17 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 7. Draw Event
+    // 8. Other Events
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->event_scripts[GM82_EVENT_OTHER]) {
+            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_OTHER]);
+            gm82_instance_sync_vars_from_vm(inst);
+        }
+    }
+
+    // 9. Draw Event
     gm82_instance **draw_order = malloc(sizeof(gm82_instance *) * count);
     if (draw_order) {
         memcpy(draw_order, instances, sizeof(gm82_instance *) * count);
@@ -338,4 +378,54 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
         free(draw_order);
     }
+}
+
+void gm82_room_state_init(gm82_room_state *room, int id, int w, int h) {
+    if (!room) return;
+    memset(room, 0, sizeof(*room));
+    room->id = id;
+    room->width = w > 0 ? w : 640;
+    room->height = h > 0 ? h : 480;
+    room->capacity = 16;
+    room->instances = calloc(room->capacity, sizeof(gm82_instance *));
+}
+
+int gm82_room_state_add_instance(gm82_room_state *room, gm82_instance *inst) {
+    if (!room || !inst) return 0;
+    if (room->count >= room->capacity) {
+        size_t new_cap = room->capacity * 2;
+        gm82_instance **new_arr = realloc(room->instances, new_cap * sizeof(gm82_instance *));
+        if (!new_arr) return 0;
+        room->instances = new_arr;
+        room->capacity = new_cap;
+    }
+    room->instances[room->count++] = inst;
+    return 1;
+}
+
+void gm82_room_state_clear_transient(gm82_room_state *room) {
+    if (!room || !room->instances) return;
+    size_t keep = 0;
+    for (size_t i = 0; i < room->count; i++) {
+        gm82_instance *inst = room->instances[i];
+        if (inst && inst->persistent && !inst->destroyed) {
+            room->instances[keep++] = inst;
+        } else {
+            gm82_instance_destroy(inst);
+        }
+    }
+    room->count = keep;
+}
+
+void gm82_room_state_free(gm82_room_state *room) {
+    if (!room) return;
+    if (room->instances) {
+        for (size_t i = 0; i < room->count; i++) {
+            gm82_instance_destroy(room->instances[i]);
+        }
+        free(room->instances);
+        room->instances = NULL;
+    }
+    room->count = 0;
+    room->capacity = 0;
 }

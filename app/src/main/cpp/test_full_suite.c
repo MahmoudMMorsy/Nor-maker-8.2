@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 extern double nor_import_format_native(const char *path);
 extern double nor_validate_rom_native(const char *path, double kind);
@@ -126,14 +127,27 @@ void test_gml_builtins_suite(void) {
     gml_ast_free(ast);
     gml_value_free(&vm.return_value);
 
-    // Test sqr and log2
-    const char *math_script = "a = sqr(5); b = log2(16); return a + b;";
+    // Test sqr, log2, and dsin/dcos
+    const char *math_script = "a = sqr(5); b = log2(16); c = dsin(90); return a + b + c;";
     ok = gml_parse_program(math_script, &ast, err, sizeof(err));
     assert(ok);
     gml_vm_init(&vm);
     ok = gml_vm_execute(&vm, ast);
     assert(ok && vm.returned);
-    assert(vm.return_value.kind == GML_V_REAL && vm.return_value.real == 29.0);
+    assert(vm.return_value.kind == GML_V_REAL && fabs(vm.return_value.real - 30.0) < 0.0001);
+    gml_ast_free(ast);
+    gml_value_free(&vm.return_value);
+
+    // Test string_replace and global scoping
+    const char *glob_script = "global.score = 100; str = string_replace('GameMaker', 'Maker', 'Engine'); return str;";
+    ok = gml_parse_program(glob_script, &ast, err, sizeof(err));
+    assert(ok);
+    gml_vm_init(&vm);
+    ok = gml_vm_execute(&vm, ast);
+    assert(ok && vm.returned);
+    assert(vm.return_value.kind == GML_V_STRING && strcmp(vm.return_value.string, "GameEngine") == 0);
+    gml_value glob_val = gml_vm_get(&vm, "global.score");
+    assert(glob_val.kind == GML_V_REAL && glob_val.real == 100.0);
     gml_ast_free(ast);
     gml_value_free(&vm.return_value);
 
@@ -197,6 +211,11 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(sp->bbox_left == 0 && sp->bbox_top == 0);
     assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
     assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+
+    // Test manual bbox mode
+    gm82_sprite_asset_set_manual_bbox(sp, 4, 4, 28, 28);
+    assert(sp->bbox_left == 4 && sp->bbox_top == 4);
+    assert(sp->bbox_right == 28 && sp->bbox_bottom == 28);
 
     uint8_t dummy_rgba[16] = {255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255};
     assert(gm82_sprite_asset_set_frame_rgba(sp, 0, dummy_rgba, sizeof(dummy_rgba)) == 1);

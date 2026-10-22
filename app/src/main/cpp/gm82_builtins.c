@@ -83,6 +83,39 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         *out = gml_value_real(1.0);
         return 1;
     }
+    if (!strcmp(name, "move_wrap") && count == 3) {
+        int horiz = (int)args[0].real;
+        int vert = (int)args[1].real;
+        double margin = args[2].real;
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            double room_w = 640.0, room_h = 480.0;
+            if (horiz) {
+                if (inst->x < -margin) inst->x += room_w + margin * 2.0;
+                else if (inst->x > room_w + margin) inst->x -= room_w + margin * 2.0;
+            }
+            if (vert) {
+                if (inst->y < -margin) inst->y += room_h + margin * 2.0;
+                else if (inst->y > room_h + margin) inst->y -= room_h + margin * 2.0;
+            }
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "distance_to_point") && count == 2) {
+        double px = args[0].real;
+        double py = args[1].real;
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            double dx = px - inst->x;
+            double dy = py - inst->y;
+            *out = gml_value_real(sqrt(dx * dx + dy * dy));
+        } else {
+            *out = gml_value_real(0.0);
+        }
+        return 1;
+    }
     if (!strcmp(name, "motion_add") && count == 2) {
         double dir = args[0].real;
         double spd = args[1].real;

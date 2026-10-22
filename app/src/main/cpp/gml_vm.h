@@ -183,6 +183,7 @@ typedef struct gm82_instance {
     int sprite_index, mask_index;
     double image_index, image_speed, image_angle, image_alpha;
     double image_xscale, image_yscale;
+    double bbox_left, bbox_top, bbox_right, bbox_bottom;
     double alarms[12];
     gml_vm vm;
     const gml_ast *event_scripts[11];

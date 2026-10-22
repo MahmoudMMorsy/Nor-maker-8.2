@@ -29,6 +29,7 @@ typedef struct gm82_sprite_asset {
 
 gm82_sprite_asset *gm82_sprite_asset_create(int id, const char *name, int w, int h, int xorig, int yorig, int subimages);
 void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode);
+void gm82_sprite_asset_set_manual_bbox(gm82_sprite_asset *sprite, int left, int top, int right, int bottom);
 int gm82_sprite_asset_set_frame_rgba(gm82_sprite_asset *sprite, int frame, const uint8_t *rgba, size_t len);
 void gm82_sprite_asset_free(gm82_sprite_asset *sprite);
 

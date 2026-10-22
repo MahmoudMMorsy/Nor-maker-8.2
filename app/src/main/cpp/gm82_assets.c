@@ -65,7 +65,21 @@ void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode) {
         sprite->bbox_top = 0;
         sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
         sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
+    } else if (bbox_mode == 2) { // Custom / Manual
+        if (sprite->bbox_left < 0) sprite->bbox_left = 0;
+        if (sprite->bbox_top < 0) sprite->bbox_top = 0;
+        if (sprite->bbox_right >= sprite->width) sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
+        if (sprite->bbox_bottom >= sprite->height) sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
     }
+}
+
+void gm82_sprite_asset_set_manual_bbox(gm82_sprite_asset *sprite, int left, int top, int right, int bottom) {
+    if (!sprite) return;
+    sprite->bbox_left = left;
+    sprite->bbox_top = top;
+    sprite->bbox_right = right;
+    sprite->bbox_bottom = bottom;
+    gm82_sprite_asset_compute_bbox(sprite, 2);
 }
 
 int gm82_sprite_asset_set_frame_rgba(gm82_sprite_asset *sprite, int frame, const uint8_t *rgba, size_t len) {

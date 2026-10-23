@@ -65,6 +65,11 @@ void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode) {
         sprite->bbox_top = 0;
         sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
         sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
+    } else if (bbox_mode == 2) { // Manual - ensure within dimensions
+        if (sprite->bbox_left < 0) sprite->bbox_left = 0;
+        if (sprite->bbox_top < 0) sprite->bbox_top = 0;
+        if (sprite->bbox_right >= sprite->width) sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
+        if (sprite->bbox_bottom >= sprite->height) sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
     }
 }
 

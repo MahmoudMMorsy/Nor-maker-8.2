@@ -145,6 +145,17 @@ void test_gml_builtins_suite(void) {
     assert(gm82_native_call(NULL, "dot_product", args, 4, &out) == 1);
     assert(out.kind == GML_V_REAL && out.real == 11.0);
 
+    // Test make_color_rgb and color_get_*
+    args[0] = gml_value_real(255.0);
+    args[1] = gml_value_real(128.0);
+    args[2] = gml_value_real(64.0);
+    assert(gm82_native_call(NULL, "make_color_rgb", args, 3, &out) == 1);
+    double col = out.real;
+    args[0] = gml_value_real(col);
+    assert(gm82_native_call(NULL, "color_get_red", args, 1, &out) == 1 && out.real == 255.0);
+    assert(gm82_native_call(NULL, "color_get_green", args, 1, &out) == 1 && out.real == 128.0);
+    assert(gm82_native_call(NULL, "color_get_blue", args, 1, &out) == 1 && out.real == 64.0);
+
     printf("[PASS] GML Built-ins Suite\n");
 }
 

@@ -66,6 +66,48 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         *out = gml_value_real(diff - 180.0);
         return 1;
     }
+    if (!strcmp(name, "dsin") && count == 1) {
+        *out = gml_value_real(sin(args[0].real * 0.017453292519943295));
+        return 1;
+    }
+    if (!strcmp(name, "dcos") && count == 1) {
+        *out = gml_value_real(cos(args[0].real * 0.017453292519943295));
+        return 1;
+    }
+    if (!strcmp(name, "dtan") && count == 1) {
+        *out = gml_value_real(tan(args[0].real * 0.017453292519943295));
+        return 1;
+    }
+    if (!strcmp(name, "make_color_rgb") && count == 3) {
+        int r = (int)args[0].real & 0xFF;
+        int g = (int)args[1].real & 0xFF;
+        int b = (int)args[2].real & 0xFF;
+        *out = gml_value_real((double)(r | (g << 8) | (b << 16)));
+        return 1;
+    }
+    if (!strcmp(name, "color_get_red") && count == 1) {
+        *out = gml_value_real((double)(((int)args[0].real) & 0xFF));
+        return 1;
+    }
+    if (!strcmp(name, "color_get_green") && count == 1) {
+        *out = gml_value_real((double)((((int)args[0].real) >> 8) & 0xFF));
+        return 1;
+    }
+    if (!strcmp(name, "color_get_blue") && count == 1) {
+        *out = gml_value_real((double)((((int)args[0].real) >> 16) & 0xFF));
+        return 1;
+    }
+    if (!strcmp(name, "distance_to_point") && count == 2) {
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            double dx = args[0].real - inst->x;
+            double dy = args[1].real - inst->y;
+            *out = gml_value_real(sqrt(dx * dx + dy * dy));
+        } else {
+            *out = gml_value_real(0.0);
+        }
+        return 1;
+    }
 
     // Motion built-in functions
     if (!strcmp(name, "motion_set") && count == 2) {

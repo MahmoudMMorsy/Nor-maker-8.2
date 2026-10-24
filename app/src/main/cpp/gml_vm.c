@@ -289,11 +289,13 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
+        gm82_instance_sync_vars_to_vm(inst);
         for (int a = 0; a < 12; a++) {
             if (inst->alarms[a] > 0.0) {
                 inst->alarms[a] -= 1.0;
                 if (inst->alarms[a] <= 0.0) {
                     inst->alarms[a] = -1.0;
+                    gm82_instance_sync_vars_to_vm(inst);
                     if (inst->event_scripts[GM82_EVENT_ALARM]) {
                         gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_ALARM]);
                         gm82_instance_sync_vars_from_vm(inst);

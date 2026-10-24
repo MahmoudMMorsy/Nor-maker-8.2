@@ -56,6 +56,35 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
     }
 
     // Math & Geometry built-ins
+    if (!strcmp(name, "point_distance_3d") && count == 6) {
+        double dx = args[3].real - args[0].real;
+        double dy = args[4].real - args[1].real;
+        double dz = args[5].real - args[2].real;
+        *out = gml_value_real(sqrt(dx * dx + dy * dy + dz * dz));
+        return 1;
+    }
+    if (!strcmp(name, "degtorad") && count == 1) {
+        *out = gml_value_real(args[0].real * 0.017453292519943295);
+        return 1;
+    }
+    if (!strcmp(name, "radtodeg") && count == 1) {
+        *out = gml_value_real(args[0].real * 57.29577951308232);
+        return 1;
+    }
+    if (!strcmp(name, "sqr") && count == 1) {
+        *out = gml_value_real(args[0].real * args[0].real);
+        return 1;
+    }
+    if (!strcmp(name, "sign") && count == 1) {
+        double v = args[0].real;
+        *out = gml_value_real(v > 0.0 ? 1.0 : (v < 0.0 ? -1.0 : 0.0));
+        return 1;
+    }
+    if (!strcmp(name, "clamp") && count == 3) {
+        double v = args[0].real, lo = args[1].real, hi = args[2].real;
+        *out = gml_value_real(v < lo ? lo : (v > hi ? hi : v));
+        return 1;
+    }
     if (!strcmp(name, "dot_product") && count == 4) {
         *out = gml_value_real(args[0].real * args[2].real + args[1].real * args[3].real);
         return 1;
@@ -81,6 +110,10 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
             gm82_instance_sync_vars_to_vm(inst);
         }
         *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "instance_find") && count == 2) {
+        *out = gml_value_real(-4.0); // noone constant (-4 in GM8.2)
         return 1;
     }
     if (!strcmp(name, "motion_add") && count == 2) {

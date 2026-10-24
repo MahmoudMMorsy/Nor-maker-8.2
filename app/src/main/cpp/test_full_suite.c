@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 extern double nor_import_format_native(const char *path);
 extern double nor_validate_rom_native(const char *path, double kind);
@@ -144,6 +145,25 @@ void test_gml_builtins_suite(void) {
     args[3] = gml_value_real(4.0);
     assert(gm82_native_call(NULL, "dot_product", args, 4, &out) == 1);
     assert(out.kind == GML_V_REAL && out.real == 11.0);
+
+    // Test point_distance_3d, degtorad, radtodeg, sign, clamp
+    gml_value args6[6];
+    args6[0] = gml_value_real(0.0); args6[1] = gml_value_real(0.0); args6[2] = gml_value_real(0.0);
+    args6[3] = gml_value_real(1.0); args6[4] = gml_value_real(2.0); args6[5] = gml_value_real(2.0);
+    assert(gm82_native_call(NULL, "point_distance_3d", args6, 6, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 3.0);
+
+    args[0] = gml_value_real(180.0);
+    assert(gm82_native_call(NULL, "degtorad", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && fabs(out.real - 3.141592653589793) < 0.001);
+
+    args[0] = gml_value_real(-50.0);
+    assert(gm82_native_call(NULL, "sign", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == -1.0);
+
+    args[0] = gml_value_real(15.0); args[1] = gml_value_real(0.0); args[2] = gml_value_real(10.0);
+    assert(gm82_native_call(NULL, "clamp", args, 3, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 10.0);
 
     printf("[PASS] GML Built-ins Suite\n");
 }

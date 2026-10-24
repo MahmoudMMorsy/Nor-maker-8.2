@@ -60,11 +60,48 @@ gm82_sprite_asset *gm82_sprite_asset_create(int id, const char *name, int w, int
 
 void gm82_sprite_asset_compute_bbox(gm82_sprite_asset *sprite, int bbox_mode) {
     if (!sprite) return;
-    if (bbox_mode == 0 || bbox_mode == 1) { // Auto or Full image
+    if (bbox_mode == 1) { // Full image
         sprite->bbox_left = 0;
         sprite->bbox_top = 0;
         sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
         sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
+    } else if (bbox_mode == 2) { // Manual
+        int max_w = sprite->width > 0 ? sprite->width - 1 : 0;
+        int max_h = sprite->height > 0 ? sprite->height - 1 : 0;
+        if (sprite->bbox_left < 0) sprite->bbox_left = 0;
+        if (sprite->bbox_top < 0) sprite->bbox_top = 0;
+        if (sprite->bbox_right > max_w) sprite->bbox_right = max_w;
+        if (sprite->bbox_bottom > max_h) sprite->bbox_bottom = max_h;
+    } else { // Auto mode (0)
+        int min_x = sprite->width, max_x = -1, min_y = sprite->height, max_y = -1;
+        if (sprite->strip_surface_rgba && sprite->width > 0 && sprite->height > 0) {
+            for (int sub = 0; sub < sprite->subimage_count; sub++) {
+                size_t frame_bytes = (size_t)sprite->width * (size_t)sprite->height * 4;
+                const uint8_t *frame_pixels = sprite->strip_surface_rgba + (sub * frame_bytes);
+                for (int y = 0; y < sprite->height; y++) {
+                    for (int x = 0; x < sprite->width; x++) {
+                        uint8_t alpha = frame_pixels[(y * sprite->width + x) * 4 + 3];
+                        if (alpha > 0) {
+                            if (x < min_x) min_x = x;
+                            if (x > max_x) max_x = x;
+                            if (y < min_y) min_y = y;
+                            if (y > max_y) max_y = y;
+                        }
+                    }
+                }
+            }
+        }
+        if (max_x >= 0 && max_y >= 0) {
+            sprite->bbox_left = min_x;
+            sprite->bbox_top = min_y;
+            sprite->bbox_right = max_x;
+            sprite->bbox_bottom = max_y;
+        } else {
+            sprite->bbox_left = 0;
+            sprite->bbox_top = 0;
+            sprite->bbox_right = sprite->width > 0 ? sprite->width - 1 : 0;
+            sprite->bbox_bottom = sprite->height > 0 ? sprite->height - 1 : 0;
+        }
     }
 }
 

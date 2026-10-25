@@ -165,6 +165,13 @@ void test_gml_builtins_suite(void) {
     assert(gm82_native_call(NULL, "clamp", args, 3, &out) == 1);
     assert(out.kind == GML_V_REAL && out.real == 10.0);
 
+    // Test lengthdir_x and lengthdir_y
+    args[0] = gml_value_real(10.0); args[1] = gml_value_real(0.0); // 10 dir 0 => x=10, y=0
+    assert(gm82_native_call(NULL, "lengthdir_x", args, 2, &out) == 1);
+    assert(out.kind == GML_V_REAL && fabs(out.real - 10.0) < 0.001);
+    assert(gm82_native_call(NULL, "lengthdir_y", args, 2, &out) == 1);
+    assert(out.kind == GML_V_REAL && fabs(out.real - 0.0) < 0.001);
+
     printf("[PASS] GML Built-ins Suite\n");
 }
 

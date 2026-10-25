@@ -95,6 +95,18 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         *out = gml_value_real(diff - 180.0);
         return 1;
     }
+    if (!strcmp(name, "lengthdir_x") && count == 2) {
+        double len = args[0].real;
+        double dir = args[1].real;
+        *out = gml_value_real(len * cos(dir * 3.14159265358979323846 / 180.0));
+        return 1;
+    }
+    if (!strcmp(name, "lengthdir_y") && count == 2) {
+        double len = args[0].real;
+        double dir = args[1].real;
+        *out = gml_value_real(-len * sin(dir * 3.14159265358979323846 / 180.0));
+        return 1;
+    }
 
     // Motion built-in functions
     if (!strcmp(name, "motion_set") && count == 2) {

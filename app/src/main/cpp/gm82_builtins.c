@@ -209,10 +209,94 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         return 1;
     }
 
+    // Distance & Movement Helper built-ins
+    if (!strcmp(name, "distance_to_point") && count == 2) {
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            double px = args[0].real;
+            double py = args[1].real;
+
+            // Bounding box bounds (fallback to point if no sprite)
+            double left = inst->x;
+            double right = inst->x;
+            double top = inst->y;
+            double bottom = inst->y;
+
+            if (px < left) px = left - px;
+            else if (px > right) px = px - right;
+            else px = 0.0;
+
+            if (py < top) py = top - py;
+            else if (py > bottom) py = py - bottom;
+            else py = 0.0;
+
+            *out = gml_value_real(sqrt(px * px + py * py));
+            return 1;
+        }
+        *out = gml_value_real(0.0);
+        return 1;
+    }
+    if (!strcmp(name, "move_random") && count == 2) {
+        double hsnap = args[0].real;
+        double vsnap = args[1].real;
+        if (userdata && hsnap > 0.0 && vsnap > 0.0) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            gml_value rw = gml_vm_get(&inst->vm, "room_width");
+            gml_value rh = gml_vm_get(&inst->vm, "room_height");
+            double r_w = rw.kind == GML_V_REAL ? rw.real : 640.0;
+            double r_h = rh.kind == GML_V_REAL ? rh.real : 480.0;
+            gml_value_free(&rw);
+            gml_value_free(&rh);
+
+            inst->x = floor(((double)rand() / (double)RAND_MAX * r_w) / hsnap) * hsnap;
+            inst->y = floor(((double)rand() / (double)RAND_MAX * r_h) / vsnap) * vsnap;
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "move_wrap") && count == 3) {
+        int hor = (int)args[0].real;
+        int vert = (int)args[1].real;
+        double margin = args[2].real;
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            gml_value rw = gml_vm_get(&inst->vm, "room_width");
+            gml_value rh = gml_vm_get(&inst->vm, "room_height");
+            double r_w = rw.kind == GML_V_REAL ? rw.real : 640.0;
+            double r_h = rh.kind == GML_V_REAL ? rh.real : 480.0;
+            gml_value_free(&rw);
+            gml_value_free(&rh);
+
+            if (hor) {
+                if (inst->x < -margin) inst->x += r_w + margin * 2.0;
+                else if (inst->x > r_w + margin) inst->x -= r_w + margin * 2.0;
+            }
+            if (vert) {
+                if (inst->y < -margin) inst->y += r_h + margin * 2.0;
+                else if (inst->y > r_h + margin) inst->y -= r_h + margin * 2.0;
+            }
+            gm82_instance_sync_vars_to_vm(inst);
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+
+    // Audio & Sound built-ins
+    if (!strcmp(name, "sound_play") || !strcmp(name, "sound_loop") || !strcmp(name, "sound_stop") || !strcmp(name, "sound_stop_all")) {
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "sound_isplaying")) {
+        *out = gml_value_bool(0);
+        return 1;
+    }
+
     // Drawing & Text built-ins
     if (!strcmp(name, "draw_sprite") || !strcmp(name, "draw_sprite_ext") || !strcmp(name, "draw_text") ||
+        !strcmp(name, "draw_text_ext") || !strcmp(name, "draw_self") || !strcmp(name, "draw_sprite_part") ||
         !strcmp(name, "draw_line") || !strcmp(name, "draw_rectangle") || !strcmp(name, "draw_circle") ||
-        !strcmp(name, "draw_set_color") || !strcmp(name, "draw_set_alpha")) {
+        !strcmp(name, "draw_healthbar") || !strcmp(name, "draw_set_color") || !strcmp(name, "draw_set_alpha")) {
         *out = gml_value_real(1.0);
         return 1;
     }

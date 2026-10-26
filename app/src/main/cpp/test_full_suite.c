@@ -172,6 +172,29 @@ void test_gml_builtins_suite(void) {
     assert(gm82_native_call(NULL, "lengthdir_y", args, 2, &out) == 1);
     assert(out.kind == GML_V_REAL && fabs(out.real - 0.0) < 0.001);
 
+    // Test extended GM8.2 built-ins (distance_to_point, sound_play, draw_self, move_wrap)
+    assert(gm82_native_call(NULL, "sound_play", NULL, 0, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 1.0);
+    assert(gm82_native_call(NULL, "sound_isplaying", NULL, 0, &out) == 1);
+    assert(out.kind == GML_V_BOOL && out.boolean == 0);
+
+    gm82_instance test_inst;
+    memset(&test_inst, 0, sizeof(test_inst));
+    test_inst.x = 100.0;
+    test_inst.y = 100.0;
+    args[0] = gml_value_real(103.0);
+    args[1] = gml_value_real(104.0);
+    assert(gm82_native_call(&test_inst, "distance_to_point", args, 2, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 5.0);
+
+    test_inst.x = -20.0;
+    test_inst.y = 100.0;
+    args[0] = gml_value_real(1.0); // horizontal wrap
+    args[1] = gml_value_real(0.0);
+    args[2] = gml_value_real(10.0); // margin 10
+    assert(gm82_native_call(&test_inst, "move_wrap", args, 3, &out) == 1);
+    assert(test_inst.x > 0.0);
+
     printf("[PASS] GML Built-ins Suite\n");
 }
 

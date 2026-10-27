@@ -152,6 +152,10 @@ void gm82_instance_sync_vars_from_vm(gm82_instance *inst) {
 
     inst->x = num(gml_vm_get(&inst->vm, "x"));
     inst->y = num(gml_vm_get(&inst->vm, "y"));
+    inst->xprevious = num(gml_vm_get(&inst->vm, "xprevious"));
+    inst->yprevious = num(gml_vm_get(&inst->vm, "yprevious"));
+    inst->xstart = num(gml_vm_get(&inst->vm, "xstart"));
+    inst->ystart = num(gml_vm_get(&inst->vm, "ystart"));
     inst->hspeed = num(gml_vm_get(&inst->vm, "hspeed"));
     inst->vspeed = num(gml_vm_get(&inst->vm, "vspeed"));
     inst->speed = num(gml_vm_get(&inst->vm, "speed"));

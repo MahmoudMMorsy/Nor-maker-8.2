@@ -138,6 +138,14 @@ void test_gml_builtins_suite(void) {
     gml_ast_free(ast);
     gml_value_free(&vm.return_value);
 
+    // Test dsin and dcos
+    args[0] = gml_value_real(90.0);
+    assert(gm82_native_call(NULL, "dsin", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && fabs(out.real - 1.0) < 0.001);
+    args[0] = gml_value_real(0.0);
+    assert(gm82_native_call(NULL, "dcos", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && fabs(out.real - 1.0) < 0.001);
+
     // Test dot_product and angle_difference
     args[0] = gml_value_real(1.0);
     args[1] = gml_value_real(2.0);
@@ -247,6 +255,14 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(sp->bbox_left == 0 && sp->bbox_top == 0);
     assert(sp->bbox_right == 31 && sp->bbox_bottom == 31);
     assert(sp->strip_surface_size == 32 * 32 * 4 * 4);
+
+    // Test BBox mode Full (1) and Manual (2)
+    gm82_sprite_asset_compute_bbox(sp, 1);
+    assert(sp->bbox_left == 0 && sp->bbox_top == 0 && sp->bbox_right == 31 && sp->bbox_bottom == 31);
+
+    sp->bbox_left = 4; sp->bbox_top = 4; sp->bbox_right = 28; sp->bbox_bottom = 28;
+    gm82_sprite_asset_compute_bbox(sp, 2);
+    assert(sp->bbox_left == 4 && sp->bbox_top == 4 && sp->bbox_right == 28 && sp->bbox_bottom == 28);
 
     uint8_t dummy_rgba[16] = {255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255};
     assert(gm82_sprite_asset_set_frame_rgba(sp, 0, dummy_rgba, sizeof(dummy_rgba)) == 1);

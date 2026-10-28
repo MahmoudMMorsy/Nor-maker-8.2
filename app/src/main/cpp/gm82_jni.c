@@ -18,6 +18,7 @@ static int g_runtime_active = 0;
 static int g_current_room = 0;
 static int g_room_w = 640;
 static int g_room_h = 480;
+static gm82_room_state g_room_state;
 static char g_token_buf[1024] = {0};
 static char g_token_sep[16] = {0};
 static char *g_token_ctx = NULL;
@@ -29,6 +30,8 @@ Java_com_normaker_nativefull_MainActivity_nativeRuntimeCreate(JNIEnv *env, jclas
     g_runtime_active = 1;
     g_room_w = width > 0 ? width : 640;
     g_room_h = height > 0 ? height : 480;
+    gm82_room_state_free(&g_room_state);
+    gm82_room_state_init(&g_room_state, g_current_room, g_room_w, g_room_h);
     LOGI("Runtime created: %dx%d", g_room_w, g_room_h);
     return JNI_TRUE;
 }
@@ -36,12 +39,16 @@ Java_com_normaker_nativefull_MainActivity_nativeRuntimeCreate(JNIEnv *env, jclas
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeDestroy(JNIEnv *env, jclass clazz) {
     g_runtime_active = 0;
+    gm82_room_state_free(&g_room_state);
     LOGI("Runtime destroyed");
 }
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeStep(JNIEnv *env, jclass clazz, jfloat delta) {
     (void)env; (void)clazz; (void)delta;
+    if (g_runtime_active && g_room_state.count > 0) {
+        gm82_event_loop_step(g_room_state.instances, g_room_state.count);
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -131,9 +138,24 @@ Java_com_normaker_nativefull_MainActivity_nativeRuntimeClearEvents(JNIEnv *env, 
 
 JNIEXPORT jint JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeAddInstance(JNIEnv *env, jclass clazz, jint objectId, jint spriteId, jint spriteWidth, jint spriteHeight, jint spriteSubimages, jfloat x, jfloat y, jfloat vx, jfloat vy) {
-    (void)env; (void)clazz; (void)objectId; (void)spriteId; (void)spriteWidth; (void)spriteHeight; (void)spriteSubimages; (void)x; (void)y; (void)vx; (void)vy;
+    (void)env; (void)clazz; (void)spriteWidth; (void)spriteHeight; (void)spriteSubimages;
     static int inst_counter = 100000;
-    return ++inst_counter;
+    int id = ++inst_counter;
+    gm82_instance *inst = gm82_instance_create(id, objectId, (double)x, (double)y);
+    if (inst) {
+        inst->sprite_index = spriteId;
+        inst->hspeed = (double)vx;
+        inst->vspeed = (double)vy;
+        inst->speed = sqrt(inst->hspeed * inst->hspeed + inst->vspeed * inst->vspeed);
+        if (inst->speed > 0.00001) {
+            inst->direction = atan2(-inst->vspeed, inst->hspeed) * 57.29577951308232;
+            if (inst->direction < 0.0) inst->direction += 360.0;
+        }
+        gm82_instance_sync_vars_to_vm(inst);
+        gml_vm_set_native_call(&inst->vm, gm82_native_call, inst);
+        gm82_room_state_add_instance(&g_room_state, inst);
+    }
+    return id;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -151,11 +173,14 @@ Java_com_normaker_nativefull_MainActivity_nativeRuntimeRenderBitmap(JNIEnv *env,
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeClearInstances(JNIEnv *env, jclass clazz) {
     (void)env; (void)clazz;
+    gm82_room_state_free(&g_room_state);
+    gm82_room_state_init(&g_room_state, g_current_room, g_room_w, g_room_h);
 }
 
 JNIEXPORT void JNICALL
 Java_com_normaker_nativefull_MainActivity_nativeRuntimeClearRoomTransient(JNIEnv *env, jclass clazz) {
     (void)env; (void)clazz;
+    gm82_room_state_clear_transient(&g_room_state);
 }
 
 JNIEXPORT jboolean JNICALL

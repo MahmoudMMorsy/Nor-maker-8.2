@@ -55,6 +55,36 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         return 1;
     }
 
+    // Degree trigonometric functions
+    if (!strcmp(name, "dsin") && count == 1) {
+        *out = gml_value_real(sin(args[0].real * 0.017453292519943295));
+        return 1;
+    }
+    if (!strcmp(name, "dcos") && count == 1) {
+        *out = gml_value_real(cos(args[0].real * 0.017453292519943295));
+        return 1;
+    }
+    if (!strcmp(name, "dtan") && count == 1) {
+        *out = gml_value_real(tan(args[0].real * 0.017453292519943295));
+        return 1;
+    }
+    if (!strcmp(name, "darcsin") && count == 1) {
+        *out = gml_value_real(asin(args[0].real) * 57.29577951308232);
+        return 1;
+    }
+    if (!strcmp(name, "darccos") && count == 1) {
+        *out = gml_value_real(acos(args[0].real) * 57.29577951308232);
+        return 1;
+    }
+    if (!strcmp(name, "darctan") && count == 1) {
+        *out = gml_value_real(atan(args[0].real) * 57.29577951308232);
+        return 1;
+    }
+    if (!strcmp(name, "darctan2") && count == 2) {
+        *out = gml_value_real(atan2(args[0].real, args[1].real) * 57.29577951308232);
+        return 1;
+    }
+
     // Math & Geometry built-ins
     if (!strcmp(name, "point_distance_3d") && count == 6) {
         double dx = args[3].real - args[0].real;

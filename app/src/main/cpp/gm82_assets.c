@@ -112,6 +112,7 @@ int gm82_sprite_asset_set_frame_rgba(gm82_sprite_asset *sprite, int frame, const
     if (offset + frame_bytes > sprite->strip_surface_size) return 0;
     size_t copy_bytes = len < frame_bytes ? len : frame_bytes;
     memcpy(sprite->strip_surface_rgba + offset, rgba, copy_bytes);
+    gm82_sprite_asset_compute_bbox(sprite, 0);
     return 1;
 }
 

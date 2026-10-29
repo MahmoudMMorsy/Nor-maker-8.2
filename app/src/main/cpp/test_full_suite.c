@@ -113,6 +113,45 @@ void test_gml_builtins_suite(void) {
     assert(gm82_native_call(NULL, "instance_position", args, 3, &out) == 1);
     assert(out.kind == GML_V_REAL && out.real == -4.0);
 
+    // Test string_letters, string_lower, string_upper
+    args[0] = gml_value_string("Stage 12 Score 450!");
+    assert(gm82_native_call(NULL, "string_letters", args, 1, &out) == 1);
+    assert(out.kind == GML_V_STRING && strcmp(out.string, "StageScore") == 0);
+    gml_value_free(&args[0]);
+    gml_value_free(&out);
+
+    args[0] = gml_value_string("NorMaker GM82");
+    assert(gm82_native_call(NULL, "string_lower", args, 1, &out) == 1);
+    assert(out.kind == GML_V_STRING && strcmp(out.string, "normaker gm82") == 0);
+    gml_value_free(&args[0]);
+    gml_value_free(&out);
+
+    args[0] = gml_value_string("NorMaker GM82");
+    assert(gm82_native_call(NULL, "string_upper", args, 1, &out) == 1);
+    assert(out.kind == GML_V_STRING && strcmp(out.string, "NORMAKER GM82") == 0);
+    gml_value_free(&args[0]);
+    gml_value_free(&out);
+
+    // Test abs, floor, ceil, min, max
+    args[0] = gml_value_real(-42.5);
+    assert(gm82_native_call(NULL, "abs", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 42.5);
+
+    assert(gm82_native_call(NULL, "floor", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == -43.0);
+
+    assert(gm82_native_call(NULL, "ceil", args, 1, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == -42.0);
+
+    args[0] = gml_value_real(10.0);
+    args[1] = gml_value_real(2.0);
+    args[2] = gml_value_real(85.0);
+    assert(gm82_native_call(NULL, "min", args, 3, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 2.0);
+
+    assert(gm82_native_call(NULL, "max", args, 3, &out) == 1);
+    assert(out.kind == GML_V_REAL && out.real == 85.0);
+
     // Test string_digits("Stage 12 Score 450") == "12450" via GML VM script execution
     const char *dig_script = "s = 'Stage 12 Score 450'; return string_digits(s);";
     gml_ast *ast = NULL;

@@ -55,7 +55,166 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         return 1;
     }
 
+    // Additional String & Conversion Functions
+    if (!strcmp(name, "string_digits") && count == 1) {
+        const char *s = (args[0].kind == GML_V_STRING && args[0].string) ? args[0].string : "";
+        size_t nlen = strlen(s);
+        char *buf = malloc(nlen + 1);
+        if (buf) {
+            size_t out_i = 0;
+            for (size_t i = 0; i < nlen; i++) {
+                if (s[i] >= '0' && s[i] <= '9') {
+                    buf[out_i++] = s[i];
+                }
+            }
+            buf[out_i] = 0;
+            *out = gml_value_string(buf);
+            free(buf);
+        } else {
+            *out = gml_value_string("");
+        }
+        return 1;
+    }
+    if (!strcmp(name, "string_letters") && count == 1) {
+        const char *s = (args[0].kind == GML_V_STRING && args[0].string) ? args[0].string : "";
+        size_t nlen = strlen(s);
+        char *buf = malloc(nlen + 1);
+        if (buf) {
+            size_t out_i = 0;
+            for (size_t i = 0; i < nlen; i++) {
+                if ((s[i] >= 'a' && s[i] <= 'z') || (s[i] >= 'A' && s[i] <= 'Z')) {
+                    buf[out_i++] = s[i];
+                }
+            }
+            buf[out_i] = 0;
+            *out = gml_value_string(buf);
+            free(buf);
+        } else {
+            *out = gml_value_string("");
+        }
+        return 1;
+    }
+    if (!strcmp(name, "string_lower") && count == 1) {
+        const char *s = (args[0].kind == GML_V_STRING && args[0].string) ? args[0].string : "";
+        size_t nlen = strlen(s);
+        char *buf = malloc(nlen + 1);
+        if (buf) {
+            for (size_t i = 0; i < nlen; i++) {
+                char c = s[i];
+                if (c >= 'A' && c <= 'Z') c = (char)(c + ('a' - 'A'));
+                buf[i] = c;
+            }
+            buf[nlen] = 0;
+            *out = gml_value_string(buf);
+            free(buf);
+        } else {
+            *out = gml_value_string("");
+        }
+        return 1;
+    }
+    if (!strcmp(name, "string_upper") && count == 1) {
+        const char *s = (args[0].kind == GML_V_STRING && args[0].string) ? args[0].string : "";
+        size_t nlen = strlen(s);
+        char *buf = malloc(nlen + 1);
+        if (buf) {
+            for (size_t i = 0; i < nlen; i++) {
+                char c = s[i];
+                if (c >= 'a' && c <= 'z') c = (char)(c - ('a' - 'A'));
+                buf[i] = c;
+            }
+            buf[nlen] = 0;
+            *out = gml_value_string(buf);
+            free(buf);
+        } else {
+            *out = gml_value_string("");
+        }
+        return 1;
+    }
+    if (!strcmp(name, "real") && count == 1) {
+        if (args[0].kind == GML_V_STRING && args[0].string) {
+            *out = gml_value_real(atof(args[0].string));
+        } else if (args[0].kind == GML_V_REAL) {
+            *out = gml_value_real(args[0].real);
+        } else {
+            *out = gml_value_real(0.0);
+        }
+        return 1;
+    }
+    if (!strcmp(name, "string") && count == 1) {
+        if (args[0].kind == GML_V_STRING && args[0].string) {
+            *out = gml_value_string(args[0].string);
+        } else if (args[0].kind == GML_V_REAL) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%g", args[0].real);
+            *out = gml_value_string(buf);
+        } else if (args[0].kind == GML_V_BOOL) {
+            *out = gml_value_string(args[0].boolean ? "1" : "0");
+        } else {
+            *out = gml_value_string("");
+        }
+        return 1;
+    }
+
     // Math & Geometry built-ins
+    if (!strcmp(name, "abs") && count == 1) {
+        *out = gml_value_real(fabs(args[0].real));
+        return 1;
+    }
+    if (!strcmp(name, "floor") && count == 1) {
+        *out = gml_value_real(floor(args[0].real));
+        return 1;
+    }
+    if (!strcmp(name, "ceil") && count == 1) {
+        *out = gml_value_real(ceil(args[0].real));
+        return 1;
+    }
+    if (!strcmp(name, "round") && count == 1) {
+        *out = gml_value_real(round(args[0].real));
+        return 1;
+    }
+    if (!strcmp(name, "random") && count == 1) {
+        double max_v = args[0].real;
+        double r = ((double)rand() / (double)RAND_MAX) * max_v;
+        *out = gml_value_real(r);
+        return 1;
+    }
+    if (!strcmp(name, "irandom") && count == 1) {
+        int max_v = (int)args[0].real;
+        int r = max_v > 0 ? (rand() % (max_v + 1)) : 0;
+        *out = gml_value_real((double)r);
+        return 1;
+    }
+    if (!strcmp(name, "random_range") && count == 2) {
+        double min_v = args[0].real;
+        double max_v = args[1].real;
+        double r = min_v + ((double)rand() / (double)RAND_MAX) * (max_v - min_v);
+        *out = gml_value_real(r);
+        return 1;
+    }
+    if (!strcmp(name, "irandom_range") && count == 2) {
+        int min_v = (int)args[0].real;
+        int max_v = (int)args[1].real;
+        int span = (max_v - min_v) + 1;
+        int r = span > 0 ? (min_v + (rand() % span)) : min_v;
+        *out = gml_value_real((double)r);
+        return 1;
+    }
+    if (!strcmp(name, "min") && count >= 1) {
+        double min_v = args[0].real;
+        for (size_t i = 1; i < count; i++) {
+            if (args[i].real < min_v) min_v = args[i].real;
+        }
+        *out = gml_value_real(min_v);
+        return 1;
+    }
+    if (!strcmp(name, "max") && count >= 1) {
+        double max_v = args[0].real;
+        for (size_t i = 1; i < count; i++) {
+            if (args[i].real > max_v) max_v = args[i].real;
+        }
+        *out = gml_value_real(max_v);
+        return 1;
+    }
     if (!strcmp(name, "point_distance_3d") && count == 6) {
         double dx = args[3].real - args[0].real;
         double dy = args[4].real - args[1].real;

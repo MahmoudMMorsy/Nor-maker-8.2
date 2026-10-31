@@ -224,19 +224,29 @@ void test_gm82_instance_and_event_loop_suite(void) {
     assert(inst->speed == 5.0 && inst->direction == 0.0);
     assert(inst->hspeed == 5.0 && inst->vspeed == 0.0);
 
-    // 2. Test event loop execution
+    // 2. Test event loop execution & Solid pushback
     gml_ast *step_ast = NULL;
     char err[160] = {0};
     int ok = gml_parse_program("x += 1; y += 2;", &step_ast, err, sizeof(err));
     assert(ok);
 
     inst->event_scripts[GM82_EVENT_STEP] = step_ast;
-    gm82_instance *instances[1] = {inst};
-    gm82_event_loop_step(instances, 1);
+    gm82_instance *instances[2];
+    instances[0] = inst;
 
-    assert(inst->x > 104.0);
+    // Create a solid wall instance colliding with inst
+    gm82_instance *wall = gm82_instance_create(100002, 2, 105.0, 97.5);
+    wall->solid = 1;
+    instances[1] = wall;
+
+    gm82_event_loop_step(instances, 2);
+
+    // Verify solid rollback moved inst back to previous position
+    assert(inst->x == inst->xprevious);
+    assert(inst->y == inst->yprevious);
 
     gml_ast_free(step_ast);
+    gm82_instance_destroy(wall);
     gm82_instance_destroy(inst);
 
     // 3. Test Sprite Asset and Bounding Box and Frame RGBA

@@ -124,6 +124,25 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
         *out = gml_value_real(1.0);
         return 1;
     }
+    if (!strcmp(name, "instance_create") && count >= 3) {
+        double x = args[0].real;
+        double y = args[1].real;
+        int obj_idx = (int)args[2].real;
+        static int dyn_id = 200000;
+        int new_id = ++dyn_id;
+        gm82_instance *new_inst = gm82_instance_create(new_id, obj_idx, x, y);
+        *out = gml_value_real((double)new_id);
+        (void)new_inst;
+        return 1;
+    }
+    if (!strcmp(name, "instance_destroy") && (count == 0 || count == 1)) {
+        if (userdata) {
+            gm82_instance *inst = (gm82_instance *)userdata;
+            inst->destroyed = 1;
+        }
+        *out = gml_value_real(1.0);
+        return 1;
+    }
     if (!strcmp(name, "instance_find") && count == 2) {
         *out = gml_value_real(-4.0); // noone constant (-4 in GM8.2)
         return 1;
@@ -284,6 +303,10 @@ int gm82_native_call(void *userdata, const char *name, const gml_value *args, si
 
     // Audio & Sound built-ins
     if (!strcmp(name, "sound_play") || !strcmp(name, "sound_loop") || !strcmp(name, "sound_stop") || !strcmp(name, "sound_stop_all")) {
+        *out = gml_value_real(1.0);
+        return 1;
+    }
+    if (!strcmp(name, "sound_volume") && count == 2) {
         *out = gml_value_real(1.0);
         return 1;
     }

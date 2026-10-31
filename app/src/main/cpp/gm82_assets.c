@@ -54,6 +54,10 @@ gm82_sprite_asset *gm82_sprite_asset_create(int id, const char *name, int w, int
     sp->subimage_count = subimages > 0 ? subimages : 1;
     sp->strip_surface_size = (size_t)sp->width * (size_t)sp->height * (size_t)sp->subimage_count * 4;
     sp->strip_surface_rgba = calloc(1, sp->strip_surface_size);
+    if (!sp->strip_surface_rgba) {
+        free(sp);
+        return NULL;
+    }
     gm82_sprite_asset_compute_bbox(sp, 0);
     return sp;
 }

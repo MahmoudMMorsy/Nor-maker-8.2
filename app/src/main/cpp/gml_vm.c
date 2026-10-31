@@ -133,6 +133,10 @@ void gm82_instance_sync_vars_to_vm(gm82_instance *inst) {
     gml_vm_set(&inst->vm, "image_alpha", gml_value_real(inst->image_alpha));
     gml_vm_set(&inst->vm, "image_xscale", gml_value_real(inst->image_xscale));
     gml_vm_set(&inst->vm, "image_yscale", gml_value_real(inst->image_yscale));
+    gml_vm_set(&inst->vm, "bbox_left", gml_value_real(inst->bbox_left));
+    gml_vm_set(&inst->vm, "bbox_top", gml_value_real(inst->bbox_top));
+    gml_vm_set(&inst->vm, "bbox_right", gml_value_real(inst->bbox_right));
+    gml_vm_set(&inst->vm, "bbox_bottom", gml_value_real(inst->bbox_bottom));
     gml_vm_set(&inst->vm, "id", gml_value_real((double)inst->id));
     gml_vm_set(&inst->vm, "object_index", gml_value_real((double)inst->object_index));
 
@@ -271,25 +275,51 @@ static int depth_cmp(const void *a, const void *b) {
     return 0;
 }
 
+static int gm82_check_collision(const gm82_instance *a, const gm82_instance *b) {
+    if (!a || !b || a == b || a->destroyed || b->destroyed) return 0;
+    // Axis-Aligned Bounding Box (AABB) intersection based on bbox or x,y
+    double al = a->x + a->bbox_left;
+    double ar = a->x + a->bbox_right;
+    double at = a->y + a->bbox_top;
+    double ab = a->y + a->bbox_bottom;
+    if (al == ar && at == ab) { al = a->x - 16.0; ar = a->x + 16.0; at = a->y - 16.0; ab = a->y + 16.0; }
+
+    double bl = b->x + b->bbox_left;
+    double br = b->x + b->bbox_right;
+    double bt = b->y + b->bbox_top;
+    double bb = b->y + b->bbox_bottom;
+    if (bl == br && bt == bb) { bl = b->x - 16.0; br = b->x + 16.0; bt = b->y - 16.0; bb = b->y + 16.0; }
+
+    return (al < br && ar > bl && at < bb && ab > bt);
+}
+
 void gm82_event_loop_step(gm82_instance **instances, size_t count) {
     if (!instances || count == 0) return;
+
+    // GM 8.2 Event Order:
+    // 0. Update xprevious and yprevious to x and y at the very start of the frame
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        inst->xprevious = inst->x;
+        inst->yprevious = inst->y;
+        gm82_instance_sync_vars_to_vm(inst);
+    }
 
     // 1. Begin Step
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
-        gm82_instance_sync_vars_to_vm(inst);
         if (inst->event_scripts[GM82_EVENT_BEGIN_STEP]) {
             gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_BEGIN_STEP]);
             gm82_instance_sync_vars_from_vm(inst);
         }
     }
 
-    // 2. Alarm Events
+    // 2. Alarm Events (Alarms count down and run on 0)
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
-        gm82_instance_sync_vars_to_vm(inst);
         for (int a = 0; a < 12; a++) {
             if (inst->alarms[a] > 0.0) {
                 inst->alarms[a] -= 1.0;
@@ -329,29 +359,74 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 5. End Step Event
+    // 5. Motion Updates (Instance Update: Friction, Gravity, Move)
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        // Gravity is applied
+        if (inst->gravity != 0.0) {
+            double grav_rad = inst->gravity_direction * GM82_DEG2RAD;
+            inst->hspeed += inst->gravity * cos(grav_rad);
+            inst->vspeed -= inst->gravity * sin(grav_rad);
+            inst->speed = sqrt(inst->hspeed * inst->hspeed + inst->vspeed * inst->vspeed);
+            if (inst->speed > 0.00001) {
+                inst->direction = atan2(-inst->vspeed, inst->hspeed) / GM82_DEG2RAD;
+                if (inst->direction < 0.0) inst->direction += 360.0;
+            }
+        }
+        // Friction is applied
+        if (inst->friction > 0.0 && inst->speed > 0.0) {
+            inst->speed -= inst->friction;
+            if (inst->speed < 0.0) inst->speed = 0.0;
+            double dir_rad = inst->direction * GM82_DEG2RAD;
+            inst->hspeed = inst->speed * cos(dir_rad);
+            inst->vspeed = -inst->speed * sin(dir_rad);
+        }
+        // Move to new position
+        inst->x += inst->hspeed;
+        inst->y += inst->vspeed;
+        gm82_instance_sync_vars_to_vm(inst);
+    }
+
+    // 6. Collision Events & Solid Pushback (GM 8.2 standard solid collision behavior)
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        for (size_t j = i + 1; j < count; j++) {
+            gm82_instance *other = instances[j];
+            if (!other || other->destroyed) continue;
+            if (gm82_check_collision(inst, other)) {
+                int either_solid = inst->solid || other->solid;
+                if (either_solid) {
+                    // Solid pushback: move both to x/yprevious
+                    inst->x = inst->xprevious;
+                    inst->y = inst->yprevious;
+                    other->x = other->xprevious;
+                    other->y = other->yprevious;
+                    gm82_instance_sync_vars_to_vm(inst);
+                    gm82_instance_sync_vars_to_vm(other);
+                }
+                // Collision events
+                if (inst->event_scripts[GM82_EVENT_COLLISION]) {
+                    gml_vm_set(&inst->vm, "other_id", gml_value_real((double)other->id));
+                    gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_COLLISION]);
+                    gm82_instance_sync_vars_from_vm(inst);
+                }
+                if (other->event_scripts[GM82_EVENT_COLLISION]) {
+                    gml_vm_set(&other->vm, "other_id", gml_value_real((double)inst->id));
+                    gml_vm_execute(&other->vm, other->event_scripts[GM82_EVENT_COLLISION]);
+                    gm82_instance_sync_vars_from_vm(other);
+                }
+            }
+        }
+    }
+
+    // 7. End Step Event
     for (size_t i = 0; i < count; i++) {
         gm82_instance *inst = instances[i];
         if (!inst || inst->destroyed) continue;
         if (inst->event_scripts[GM82_EVENT_END_STEP]) {
             gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_END_STEP]);
-            gm82_instance_sync_vars_from_vm(inst);
-        }
-    }
-
-    // 6. Motion Updates
-    for (size_t i = 0; i < count; i++) {
-        gm82_instance *inst = instances[i];
-        if (!inst || inst->destroyed) continue;
-        gm82_instance_update_motion(inst);
-    }
-
-    // 7. Collision Events
-    for (size_t i = 0; i < count; i++) {
-        gm82_instance *inst = instances[i];
-        if (!inst || inst->destroyed) continue;
-        if (inst->event_scripts[GM82_EVENT_COLLISION]) {
-            gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_COLLISION]);
             gm82_instance_sync_vars_from_vm(inst);
         }
     }
@@ -366,7 +441,7 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
         }
     }
 
-    // 9. Draw Event
+    // 9. Draw Event (sorted by depth in descending order: larger depth drawn first, smaller on top)
     gm82_instance **draw_order = malloc(sizeof(gm82_instance *) * count);
     if (draw_order) {
         memcpy(draw_order, instances, sizeof(gm82_instance *) * count);
@@ -379,6 +454,23 @@ void gm82_event_loop_step(gm82_instance **instances, size_t count) {
             }
         }
         free(draw_order);
+    }
+
+    // 10. Animation advancement & Animation End Event
+    for (size_t i = 0; i < count; i++) {
+        gm82_instance *inst = instances[i];
+        if (!inst || inst->destroyed) continue;
+        if (inst->sprite_index >= 0 && inst->image_speed != 0.0) {
+            double prev_index = inst->image_index;
+            inst->image_index += inst->image_speed;
+            if (inst->image_speed > 0.0 && floor(inst->image_index) != floor(prev_index)) {
+                if (inst->event_scripts[GM82_EVENT_ANIMATION_END]) {
+                    gml_vm_execute(&inst->vm, inst->event_scripts[GM82_EVENT_ANIMATION_END]);
+                    gm82_instance_sync_vars_from_vm(inst);
+                }
+            }
+            gm82_instance_sync_vars_to_vm(inst);
+        }
     }
 }
 
